@@ -81,7 +81,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
 .modal h3{font-family:'Space Mono',monospace;color:var(--accent);margin-bottom:18px;}
 .modal-btns{display:flex;gap:10px;margin-top:16px;}
-.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;}
+.sess-top{display:flex;align-items:center;justify-content:flex-end;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;min-height:56px;}
+.sess-room-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;pointer-events:none;}
 .sess-room-name{font-family:'Space Mono',monospace;font-size:15px;color:var(--accent);font-weight:700;}
 .room-id-tag{display:none;font-family:'Space Mono',monospace;font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:#556;cursor:pointer;user-select:all;transition:border-color .2s;}
 .room-id-tag:hover{border-color:var(--accent);color:var(--accent);}
@@ -127,7 +128,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 #activeNotes{display:none !important;}
 .note-tag{padding:1px 9px;border-radius:20px;font-family:'Space Mono',monospace;font-size:10px;border:1px solid;animation:noteIn .06s ease;}
 @keyframes noteIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
-.chat-panel{height:118px;display:flex;flex-direction:column;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;margin-top:auto;}
+.chat-panel{display:flex;flex-direction:column;border-top:1px solid var(--border);background:var(--surface);flex:1 1 auto;min-height:140px;margin-top:0;}
 .chat-msgs{flex:1;overflow-y:auto;padding:6px 16px;scrollbar-width:thin;scrollbar-color:#222 transparent;}
 .chat-msg{font-size:12px;line-height:1.5;margin-bottom:2px;}
 .chat-msg .cn{font-weight:700;font-family:'Space Mono',monospace;font-size:11px;}
@@ -146,7 +147,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v19</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -194,12 +195,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
 <div class="screen" id="session">
   <div class="sess-top">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div class="sess-room-center">
       <div class="sess-room-name" id="sessRoomName">Room</div>
       <div class="room-id-tag" id="sessRoomId" onclick="copyRoomId()">------</div>
     </div>
     <div class="sess-controls">
       <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.2" oninput="setVolume(this.value)"></div>
+      <button class="btn btn-outline" onclick="panicAllNotes()">패닉</button>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
   </div>
@@ -255,6 +257,7 @@ let midiOutputs=[];
 const recentOutboundMidi=new Map();
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
+let roomListAutoTimer=null;
 let midiAutoAttempted=false;
 let mouseDragActive=false,dragCurrentNote=null;
 let sustainPedalDown=false;
@@ -295,13 +298,13 @@ function tryConnect(url){
     updateBanner('ok','서버 연결됨');
     setConnStatus('ok');
     ['btnCreate','btnRefresh'].forEach(id=>document.getElementById(id).disabled=false);
-    refreshRooms(); startPing();
+    refreshRooms(); startPing(); startRoomListAutoRefresh();
   };
   ws.onclose=()=>{
     updateBanner('err','연결 끊김');
     setConnStatus('err');
     ['btnCreate','btnRefresh'].forEach(id=>document.getElementById(id).disabled=true);
-    stopPing();
+    stopPing(); stopRoomListAutoRefresh();
     if(currentRoomId) forceDisconnectToLobby();
     setTimeout(()=>tryConnect(url),4000);
   };
@@ -342,6 +345,17 @@ function isRecentOutboundMidi(s,n,v){
 function refreshMidiOutputs(){
   if(!midiAccess){midiOutputs=[];return;}
   midiOutputs=[...midiAccess.outputs.values()];
+}
+function sendAllNotesOffToDaw(){
+  if(!midiOutputs.length) return;
+  for(const out of midiOutputs){
+    try{
+      for(let ch=0;ch<16;ch++){
+        out.send([0xB0+ch,123,0]); // all notes off
+        out.send([0xB0+ch,120,0]); // all sound off
+      }
+    }catch{}
+  }
 }
 function sendMidiToDaw(status,data1,data2=0){
   if(!midiOutputs.length) return;
@@ -674,6 +688,21 @@ function leaveRoom(){
   showScreen('lobby');
   refreshRooms();
 }
+function panicAllNotes(){
+  for(const note of Array.from(pressedLocal)) localNoteOff(note,true);
+  for(const [key] of Array.from(activeOsc)) killNote(key,activeOsc);
+  for(const [key] of Array.from(remoteOsc)) killNote(key,remoteOsc);
+  pressedLocal.clear();
+  pressedRemote.clear();
+  heldLocalNotes.clear();
+  sustainedNotes.clear();
+  pendingNoteOns.clear();
+  sustainPedalDown=false;
+  for(let n=MIDI_MIN;n<=MIDI_MAX;n++) setKeyVisual(n,false,true,null), setKeyVisual(n,false,false,null);
+  sendAllNotesOffToDaw();
+  updateActiveNotes();
+  toast('패닉: 모든 소리 정지');
+}
 
 function forceDisconnectToLobby(){
   pressedLocal.forEach(n=>localNoteOff(n));
@@ -686,6 +715,16 @@ function forceDisconnectToLobby(){
 }
 
 function refreshRooms(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_rooms'}));}
+function startRoomListAutoRefresh(){
+  stopRoomListAutoRefresh();
+  roomListAutoTimer=setInterval(()=>{
+    const lobby=document.getElementById('lobby');
+    if(lobby && lobby.classList.contains('active')) refreshRooms();
+  },1200);
+}
+function stopRoomListAutoRefresh(){
+  if(roomListAutoTimer){clearInterval(roomListAutoTimer);roomListAutoTimer=null;}
+}
 function renderRoomList(rooms){
   const el=document.getElementById('roomList');el.innerHTML='';
   if(!rooms.length){el.innerHTML='<div class="no-rooms">현재 생성된 방 없음</div>';return;}
@@ -831,6 +870,7 @@ document.addEventListener('keyup',e=>{const n=KB_NOTES[e.key.toLowerCase()];if(n
 function showScreen(n){
   document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
   document.getElementById(n).classList.add('active');
+  if(n==='lobby') refreshRooms();
   window.scrollTo(0,0);
 }
 function setConnStatus(s){
