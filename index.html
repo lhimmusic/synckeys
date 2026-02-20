@@ -112,12 +112,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .keyboard{position:relative;flex-shrink:0;user-select:none;}
 .wkey{height:200px;background:linear-gradient(180deg,#dde0f0 0%,#f0f0ff 60%,#e8e8f8 100%);border:1px solid #9090b0;border-radius:0 0 6px 6px;cursor:pointer;position:absolute;transition:background .05s;box-shadow:inset 0 -3px 5px rgba(0,0,0,.08),1px 0 3px rgba(0,0,0,.12);}
 .wkey:hover{background:linear-gradient(180deg,#c8eeff 0%,#e0f8ff 100%);}
-.wkey.pressed-local{background:linear-gradient(180deg,var(--accent) 0%,#009bcc 100%)!important;box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 20px rgba(0,229,255,.65)!important;}
+.wkey.pressed-local{box-shadow:inset 0 3px 10px rgba(0,0,0,.35);}
 .wkey.pressed-remote{box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 18px rgba(255,255,255,.35)!important;}
 .key-label{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:7px;color:#9090b8;pointer-events:none;white-space:nowrap;}
 .bkey{height:124px;background:linear-gradient(180deg,#1c1c2e 0%,#2a2a42 80%,#1a1a2e 100%);border:1px solid #404060;border-top:none;border-radius:0 0 4px 4px;position:absolute;top:0;z-index:2;cursor:pointer;box-shadow:2px 5px 10px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);transition:background .05s;}
 .bkey:hover{background:linear-gradient(180deg,#2a2a44 0%,#383856 100%);}
-.bkey.pressed-local{background:linear-gradient(180deg,var(--accent) 0%,#007799 100%)!important;box-shadow:inset 0 3px 8px rgba(0,0,0,.4),0 0 16px rgba(0,229,255,.8)!important;}
+.bkey.pressed-local{box-shadow:inset 0 3px 8px rgba(0,0,0,.4);}
 .bkey.pressed-remote{box-shadow:inset 0 3px 8px rgba(0,0,0,.4),0 0 14px rgba(255,255,255,.45)!important;}
 .active-notes{display:none !important;}
 #activeNotes{display:none !important;}
@@ -142,7 +142,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v9</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v10</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -398,30 +398,32 @@ function setKeyVisual(note,on,isLocal,color){
     if(isLocal){
       if(on){
         el.classList.add('pressed-local');
-        el.style.background='linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)';
+        el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)','important');
+        el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
       }else{
         el.classList.remove('pressed-local');
         const r=pressedRemote.get(note);
         if(r&&r.length){
           const rc=r[r.length-1].color;
           el.classList.add('pressed-remote');
-          el.style.background='linear-gradient(180deg,'+rc+' 0%,'+darken(rc)+' 100%)';
-          el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+rc+'99';
+          el.style.setProperty('background','linear-gradient(180deg,'+rc+' 0%,'+darken(rc)+' 100%)','important');
+          el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+rc+'99','important');
         }else if(!el.classList.contains('pressed-remote')){
-          el.style.background='';el.style.boxShadow='';
+          el.style.removeProperty('background');el.style.removeProperty('box-shadow');
         }
       }
     } else {
       if(on&&color){
         el.classList.add('pressed-remote');
-        el.style.background='linear-gradient(180deg,'+color+' 0%,'+darken(color)+' 100%)';
-        el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99';
+        el.style.setProperty('background','linear-gradient(180deg,'+color+' 0%,'+darken(color)+' 100%)','important');
+        el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99','important');
       } else {
         el.classList.remove('pressed-remote');
         if(pressedLocal.has(note)){
-          el.style.background='linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)';
+          el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)','important');
+          el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
         }else{
-          el.style.background='';el.style.boxShadow='';
+          el.style.removeProperty('background');el.style.removeProperty('box-shadow');
         }
       }
     }
