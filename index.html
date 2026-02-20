@@ -149,7 +149,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v24</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v25</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -277,6 +277,7 @@ let pendingNoteOns=new Map();
 let remotePedalDown=new Map();
 let remoteHeldNotes=new Map();
 let remoteSustainedNotes=new Map();
+let remoteDawChannel=new Map();
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -389,6 +390,21 @@ function sendMidiToDaw(status,data1,data2=0){
   for(const out of midiOutputs){
     try{out.send([s,d1,d2]);}catch{}
   }
+}
+function getRemoteDawChannel(sid){
+  if(remoteDawChannel.has(sid)) return remoteDawChannel.get(sid);
+  const used=new Set(remoteDawChannel.values());
+  for(let ch=1;ch<=15;ch++){
+    if(!used.has(ch)){
+      remoteDawChannel.set(sid,ch);
+      return ch;
+    }
+  }
+  remoteDawChannel.set(sid,1);
+  return 1;
+}
+function dawStatus(baseStatus,channel){
+  return (baseStatus&0xf0)|(channel&0x0f);
 }
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
@@ -646,24 +662,27 @@ function remoteVisualRelease(note,sid){
 }
 function setRemoteSustain(sid,isDown){
   remotePedalDown.set(sid,!!isDown);
+  const ch=getRemoteDawChannel(sid);
+  sendMidiToDaw(dawStatus(0xB0,ch),64,isDown?127:0);
   if(isDown) return;
   const sustained=getRemoteNoteSet(remoteSustainedNotes,sid);
   const held=getRemoteNoteSet(remoteHeldNotes,sid);
   for(const note of Array.from(sustained)){
     if(held.has(note)) continue;
-    sendMidiToDaw(0x80,note,0);
+    sendMidiToDaw(dawStatus(0x80,ch),note,0);
     killNote(sid+'_'+note,remoteOsc);
     sustained.delete(note);
   }
 }
 function remoteNoteOn(note,sid,sname,scolor,vel){
+  const ch=getRemoteDawChannel(sid);
   getRemoteNoteSet(remoteHeldNotes,sid).add(note);
   getRemoteNoteSet(remoteSustainedNotes,sid).delete(note);
   if(!pressedRemote.has(note))pressedRemote.set(note,[]);
   const list=pressedRemote.get(note);
   if(!list.find(x=>x.sid===sid))list.push({sid,color:scolor,name:sname});
   setKeyVisual(note,true,false,scolor);
-  sendMidiToDaw(0x90,note,vel||100);
+  sendMidiToDaw(dawStatus(0x90,ch),note,vel||100);
   const key=sid+'_'+note;
   // Avoid doubled/phasey sound: when MIDI OUT exists, remote sound should come from DAW path only.
   if(remoteOsc.has(key)) killNote(key,remoteOsc);
@@ -673,6 +692,7 @@ function remoteNoteOn(note,sid,sname,scolor,vel){
   updateActiveNotes();
 }
 function remoteNoteOff(note,sid){
+  const ch=getRemoteDawChannel(sid);
   getRemoteNoteSet(remoteHeldNotes,sid).delete(note);
   remoteVisualRelease(note,sid);
   if(remotePedalDown.get(sid)){
@@ -680,7 +700,7 @@ function remoteNoteOff(note,sid){
     updateActiveNotes();
     return;
   }
-  sendMidiToDaw(0x80,note,0);
+  sendMidiToDaw(dawStatus(0x80,ch),note,0);
   killNote(sid+'_'+note,remoteOsc);
   getRemoteNoteSet(remoteSustainedNotes,sid).delete(note);
   updateActiveNotes();
@@ -710,10 +730,12 @@ function handleMsg(msg){
     case 'player_left':
       updatePlayers(msg.roomInfo.players);
       addChat(null,msg.playerName+'님이 퇴장했습니다','#556');
+      setRemoteSustain(msg.playerId,false);
       for(const[key]of remoteOsc){if(key.startsWith(msg.playerId+'_')){remoteNoteOff(parseInt(key.split('_')[1]),msg.playerId);}}
       remotePedalDown.delete(msg.playerId);
       remoteHeldNotes.delete(msg.playerId);
       remoteSustainedNotes.delete(msg.playerId);
+      remoteDawChannel.delete(msg.playerId);
       break;
     case 'midi':
       if(msg.senderId===myId) break;
@@ -779,6 +801,7 @@ function leaveRoom(){
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   sustainedSentNoteOff.clear();
   remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
+  remoteDawChannel.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   document.getElementById('chatMsgs').innerHTML='';
@@ -796,6 +819,7 @@ function resetAllNotes(){
   sustainedNotes.clear();
   sustainedSentNoteOff.clear();
   remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
+  remoteDawChannel.clear();
   pendingNoteOns.clear();
   sustainPedalDown=false;
   for(let n=MIDI_MIN;n<=MIDI_MAX;n++){
@@ -813,6 +837,7 @@ function forceDisconnectToLobby(){
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   sustainedSentNoteOff.clear();
   remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
+  remoteDawChannel.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   showScreen('lobby');
