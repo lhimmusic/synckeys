@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v16</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v17</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -448,12 +448,21 @@ function addKeyEvents(el,note){
     e.preventDefault();
     mouseDragActive=true;
     dragCurrentNote=null;
-    dragToNote(note);
-    ensureAudioReady();
+    ensureAudioReady().then(()=>{
+      if(!mouseDragActive) return;
+      dragToNote(note);
+    });
   });
   el.addEventListener('mouseenter',()=>{if(mouseDragActive)dragToNote(note);});
   el.addEventListener('mouseup',endMouseDrag);
-  el.addEventListener('touchstart',e=>{e.preventDefault();ensureAudioReady().then(()=>localNoteOn(note,100));},{passive:false});
+  el.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    heldLocalNotes.add(note);
+    ensureAudioReady().then(()=>{
+      if(!heldLocalNotes.has(note)) return;
+      localNoteOn(note,100);
+    });
+  },{passive:false});
   el.addEventListener('touchend',()=>localNoteOff(note));
 }
 function dragToNote(note){
@@ -776,7 +785,7 @@ function addChat(n,m,c){
 const KB_NOTES={'a':60,'w':61,'s':62,'e':63,'d':64,'f':65,'t':66,'g':67,'y':68,'h':69,'u':70,'j':71,'k':72};
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT' || e.repeat) return;
-  const n=KB_NOTES[e.key.toLowerCase()];if(n)ensureAudioReady().then(()=>localNoteOn(n,100));
+  const n=KB_NOTES[e.key.toLowerCase()];if(n)localNoteOn(n,100);
   if(e.key==='ArrowLeft')scrollOctave(-1);if(e.key==='ArrowRight')scrollOctave(1);
 });
 document.addEventListener('keyup',e=>{const n=KB_NOTES[e.key.toLowerCase()];if(n)localNoteOff(n);});
