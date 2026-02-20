@@ -394,14 +394,15 @@ function sendMidiToDaw(status,data1,data2=0){
 function getRemoteDawChannel(sid){
   if(remoteDawChannel.has(sid)) return remoteDawChannel.get(sid);
   const used=new Set(remoteDawChannel.values());
-  for(let ch=1;ch<=15;ch++){
+  // Reserve channel 1 for local performer, use channel 2+ for remote players.
+  for(let ch=2;ch<=15;ch++){
     if(!used.has(ch)){
       remoteDawChannel.set(sid,ch);
       return ch;
     }
   }
-  remoteDawChannel.set(sid,1);
-  return 1;
+  remoteDawChannel.set(sid,2);
+  return 2;
 }
 function dawStatus(baseStatus,channel){
   return (baseStatus&0xf0)|(channel&0x0f);
