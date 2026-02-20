@@ -79,9 +79,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
 .modal h3{font-family:'Space Mono',monospace;color:var(--accent);margin-bottom:18px;}
 .modal-btns{display:flex;gap:10px;margin-top:16px;}
-.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;}
+.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;}
 .sess-room-name{font-family:'Space Mono',monospace;font-size:15px;color:var(--accent);font-weight:700;}
-.room-id-tag{font-family:'Space Mono',monospace;font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:#556;cursor:pointer;user-select:all;transition:border-color .2s;}
+.room-id-tag{display:none;font-family:'Space Mono',monospace;font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:#556;cursor:pointer;user-select:all;transition:border-color .2s;}
 .room-id-tag:hover{border-color:var(--accent);color:var(--accent);}
 .sess-controls{display:flex;align-items:center;gap:10px;}
 .vol-row{display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:10px;color:#556;}
@@ -98,13 +98,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .lat-fill{height:100%;border-radius:3px;transition:width .6s,background .6s;}
 .lat-ms{min-width:38px;}
 .sess-main{display:flex;flex:1;flex-direction:column;overflow:hidden;min-height:0;}
-.piano-area{flex:1;display:flex;flex-direction:column;min-height:0;background:#070710;}
+.piano-area{flex:0 0 290px;display:flex;flex-direction:column;min-height:0;background:#070710;}
 .piano-toolbar{display:none;}
 .scroll-hint{color:#334;font-size:10px;letter-spacing:1px;}
 .oct-btn{width:28px;height:28px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'Space Mono',monospace;}
 .oct-btn:hover{border-color:var(--accent);color:var(--accent);}
 .view-label{color:var(--accent);font-size:12px;min-width:50px;text-align:center;}
-.piano-scroll{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;padding:16px 32px 0;scrollbar-width:thin;scrollbar-color:#252535 #070710;scroll-behavior:smooth;}
+.piano-scroll{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-start;padding:6px 32px 0;scrollbar-width:thin;scrollbar-color:#252535 #070710;scroll-behavior:smooth;}
 .piano-scroll::-webkit-scrollbar{height:6px;}
 .piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -141,7 +141,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v3</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v4</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -377,7 +377,10 @@ function buildLobbyKeyboard88(){
   dst.innerHTML=src.innerHTML;
   dst.style.width=src.style.width;
   dst.style.height=src.style.height;
-  dst.querySelectorAll('.wkey,.bkey').forEach(el=>{el.style.pointerEvents='none';});
+  dst.querySelectorAll('.wkey,.bkey').forEach(el=>{
+    const note=parseInt(el.dataset.note,10);
+    if(!Number.isNaN(note)) addKeyEvents(el,note);
+  });
   const sc=document.getElementById('lobbyPianoScroll');
   if(sc) sc.scrollLeft=Math.max(0,parseInt(src.style.width,10)/2-sc.clientWidth/2);
 }
@@ -390,7 +393,13 @@ function setKeyVisual(note,on,isLocal,color){
   ['keyboard','lobbyKeyboard'].forEach(rootId=>{
     const el=getKeyEl(note,rootId);if(!el)return;
     if(isLocal){
-      if(on)el.classList.add('pressed-local');else el.classList.remove('pressed-local');
+      if(on){
+        el.classList.add('pressed-local');
+        el.style.background='linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)';
+      }else{
+        el.classList.remove('pressed-local');
+        el.style.background='';
+      }
     } else {
       if(on&&color){
         el.classList.add('pressed-remote');
@@ -713,7 +722,7 @@ function addChat(n,m,c){
 const KB_NOTES={'a':60,'w':61,'s':62,'e':63,'d':64,'f':65,'t':66,'g':67,'y':68,'h':69,'u':70,'j':71,'k':72};
 document.addEventListener('keydown',e=>{
   if(e.target.tagName==='INPUT' || e.repeat) return;
-  const n=KB_NOTES[e.key.toLowerCase()];if(n)localNoteOn(n,100);
+  const n=KB_NOTES[e.key.toLowerCase()];if(n)ensureAudioReady().then(()=>localNoteOn(n,100));
   if(e.key==='ArrowLeft')scrollOctave(-1);if(e.key==='ArrowRight')scrollOctave(1);
 });
 document.addEventListener('keyup',e=>{const n=KB_NOTES[e.key.toLowerCase()];if(n)localNoteOff(n);});

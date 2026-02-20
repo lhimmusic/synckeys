@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "build": "mkdir -p dist && cp server.js dist/server.js && cp index.html dist/index.html && cp package.json dist/package.json",
+    "pack": "npm run build && cd dist && zip -r ../synckeys_bundle.zip ."
   },
   "dependencies": {
     "ws": "^8.16.0"
