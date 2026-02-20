@@ -242,7 +242,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 //  ▶ Cloudtype 배포 후 아래 URL을 본인 서버로 교체하세요
 //    예) const CLOUDTYPE_URL = 'wss://synckeys-xxxx.cloudtype.app';
 // ═══════════════════════════════════════════
-const CLOUDTYPE_URL = localStorage.getItem('synckeys_server') || 'ws://localhost:8080';
+const CLOUDTYPE_URL = localStorage.getItem('synckeys_server') || 'wss://port-0-synckeys-mlth5cuyfd0fce1b.sel3.cloudtype.app';
 
 // STATE
 let ws=null,myId=null,myColor='#00e5ff',myName='',currentRoomId=null,pendingJoinRoom=null;
