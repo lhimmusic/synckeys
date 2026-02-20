@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SyncKeys — 실시간 원격 합주</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Noto+Sans+KR:wght@300;400;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #08080e;
+  --surface: #101018;
+  --surface2: #181824;
+  --border: #252535;
+  --border2: #303050;
+  --accent: #00e5ff;
+  --accent2: #ff6b35;
+  --green: #00ff88;
+  --purple: #a855f7;
+  --text: #dde0f0;
+  --muted: #5555888;
+  --danger: #ff4466;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif;
+  min-height: 100vh;
+}
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+  background-size: 48px 48px;
+  pointer-events: none; z-index: 0;
+}
+
+.wrap { position: relative; z-index: 1; }
+
+/* ── HEADER ── */
+header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 28px;
+  background: rgba(8,8,14,0.92); backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 100;
+}
+.logo { font-family: 'Space Mono', monospace; font-size: 18px; font-weight: 700; letter-spacing: 3px; }
+.logo .k { color: var(--accent); } .logo .s { color: var(--accent2); }
+.conn-status { display: flex; align-items: center; gap: 8px; font-family: 'Space Mono', monospace; font-size: 11px; color: #556; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #333; transition: all .4s; }
+.dot.ok  { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.dot.err { background: var(--danger); }
+
+/* ── SCREENS ── */
+.screen { display: none; }
+.screen.active { display: block; }
+
+/* ── LOBBY ── */
+#lobby { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+
+.hero { text-align: center; margin-bottom: 52px; }
+.hero h1 {
+  font-family: 'Space Mono', monospace;
+  font-size: clamp(28px, 6vw, 60px);
+  color: var(--accent);
+  text-shadow: 0 0 60px rgba(0,229,255,.35);
+  line-height: 1.1; margin-bottom: 14px;
+}
+.hero p { color: #556088; font-size: 14px; font-weight: 300; }
+
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media(max-width:600px){ .grid2 { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 26px;
+  transition: border-color .25s;
+}
+.card:hover { border-color: var(--border2); }
+.card-title {
+  font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 2px;
+  text-transform: uppercase; color: var(--accent); margin-bottom: 20px;
+}
+
+/* form */
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 10px; color: #556; letter-spacing: 1px; text-transform: uppercase; font-family: 'Space Mono', monospace; margin-bottom: 5px; }
+.field input, .field select {
+  width: 100%; padding: 9px 13px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 7px; color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 12px; outline: none;
+  transition: border-color .2s;
+}
+.field input:focus, .field select:focus { border-color: var(--accent); }
+
+.colors { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.cswatch {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 2px solid transparent; cursor: pointer;
+  transition: transform .2s, border-color .2s;
+}
+.cswatch:hover, .cswatch.sel { transform: scale(1.25); border-color: #fff; }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 10px 22px; border: none; border-radius: 8px; cursor: pointer;
+  font-family: 'Space Mono', monospace; font-size: 12px; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase; transition: all .2s;
+}
+.btn-primary { background: var(--accent); color: #000; box-shadow: 0 0 18px rgba(0,229,255,.25); }
+.btn-primary:hover { box-shadow: 0 0 30px rgba(0,229,255,.5); transform: translateY(-1px); }
+.btn-outline { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+.btn-outline:hover { background: rgba(0,229,255,.08); }
+.btn-red { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+.btn-red:hover { background: rgba(255,68,102,.08); }
+.btn-full { width: 100%; margin-top: 6px; }
+.btn:disabled { opacity: .38; cursor: not-allowed; transform: none !important; box-shadow: none !important; }
+
+/* room list */
+.room-list { margin-top: 28px; }
+.room-list-title { font-family: 'Space Mono', monospace; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: #446; margin-bottom: 12px; }
+.room-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 13px 16px; margin-bottom: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 9px; cursor: pointer; transition: all .2s;
+}
+.room-item:hover { border-color: var(--accent); background: rgba(0,229,255,.04); }
+.room-item-left { display: flex; flex-direction: column; gap: 3px; }
+.room-item-name { font-weight: 700; font-size: 14px; }
+.room-item-meta { font-family: 'Space Mono', monospace; font-size: 11px; color: #556; }
+.room-badges { display: flex; gap: 6px; }
+.badge {
+  padding: 2px 9px; border-radius: 20px; font-size: 10px;
+  font-family: 'Space Mono', monospace; border: 1px solid var(--border);
+}
+.badge-lock { border-color: var(--accent2); color: var(--accent2); }
+.badge-full { border-color: var(--danger); color: var(--danger); }
+.no-rooms { text-align: center; padding: 32px; color: #446; font-size: 13px; }
+
+/* ── MODAL ── */
+.modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75); backdrop-filter: blur(10px);
+  display: none; align-items: center; justify-content: center; z-index: 200;
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: 16px; padding: 30px; width: 340px;
+  box-shadow: 0 0 60px rgba(0,229,255,.18);
+  animation: popIn .25s ease;
+}
+@keyframes popIn { from { transform: scale(.92); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.modal h3 { font-family: 'Space Mono', monospace; color: var(--accent); margin-bottom: 18px; }
+.modal-btns { display: flex; gap: 10px; margin-top: 16px; }
+
+/* ── SESSION ── */
+#session { display: none; flex-direction: column; height: 100vh; }
+#session.active { display: flex; }
+
+.sess-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 20px; background: var(--surface);
+  border-bottom: 1px solid var(--border); flex-wrap: wrap; gap: 10px; flex-shrink: 0;
+}
+.sess-room-name { font-family: 'Space Mono', monospace; font-size: 15px; color: var(--accent); }
+.room-id-tag {
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  padding: 3px 10px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 20px; color: #556;
+  cursor: pointer; user-select: all; transition: border-color .2s;
+}
+.room-id-tag:hover { border-color: var(--accent); color: var(--accent); }
+.sess-controls { display: flex; align-items: center; gap: 10px; }
+
+/* players bar */
+.players-bar {
+  display: flex; gap: 8px; padding: 8px 20px;
+  background: rgba(8,8,14,.6); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; align-items: center; flex-shrink: 0;
+}
+.player-chip {
+  display: flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 20px;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 12px;
+}
+.player-dot { width: 8px; height: 8px; border-radius: 50%; }
+.player-ping { font-family: 'Space Mono', monospace; font-size: 10px; color: #556; }
+
+/* latency panel */
+.latency-panel {
+  display: flex; gap: 16px; padding: 6px 20px;
+  background: rgba(8,8,14,.5); border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; align-items: center; flex-shrink: 0;
+}
+.lat-item { display: flex; align-items: center; gap: 7px; font-family: 'Space Mono', monospace; font-size: 10px; }
+.lat-bar { width: 56px; height: 5px; background: #151525; border-radius: 3px; overflow: hidden; }
+.lat-fill { height: 100%; border-radius: 3px; transition: width .6s, background .6s; }
+.lat-ms { min-width: 38px; color: var(--accent); }
+
+/* main area */
+.sess-main {
+  display: flex; flex: 1; overflow: hidden;
+  flex-direction: column;
+}
+
+/* piano section */
+.piano-wrap {
+  flex: 1; display: flex; align-items: flex-end; justify-content: center;
+  padding: 20px 10px 0; overflow: hidden; position: relative;
+}
+
+.octave-controls {
+  position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 10px; z-index: 10;
+  font-family: 'Space Mono', monospace; font-size: 12px;
+}
+.oct-btn {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface2); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; font-size: 14px;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .15s;
+}
+.oct-btn:hover { border-color: var(--accent); color: var(--accent); }
+.oct-label { color: #556; }
+
+/* piano keyboard */
+.keyboard {
+  display: flex; position: relative;
+  height: 180px; user-select: none; touch-action: none;
+}
+
+.wkey {
+  width: 44px; height: 180px;
+  background: linear-gradient(180deg, #e8e8f5 0%, #f5f5ff 100%);
+  border: 1px solid #9090b0; border-top: none;
+  border-radius: 0 0 6px 6px;
+  cursor: pointer; position: relative; flex-shrink: 0;
+  transition: background .05s;
+  box-shadow: inset 0 -2px 4px rgba(0,0,0,.1), 2px 0 4px rgba(0,0,0,.15);
+}
+.wkey:hover { background: linear-gradient(180deg, #d0f0ff 0%, #e8f8ff 100%); }
+.wkey.pressed-local {
+  background: linear-gradient(180deg, var(--accent) 0%, #00a0cc 100%) !important;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.3), 0 0 16px rgba(0,229,255,.6);
+  transform: scaleY(.97); transform-origin: top;
+}
+.wkey.pressed-remote {
+  background: linear-gradient(180deg, var(--accent2) 0%, #cc4400 100%) !important;
+  box-shadow: inset 0 2px 8px rgba(0,0,0,.3), 0 0 16px rgba(255,107,53,.6);
+  transform: scaleY(.97); transform-origin: top;
+}
+.key-label {
+  position: absolute; bottom: 6px; left: 50%; transform: translateX(-50%);
+  font-family: 'Space Mono', monospace; font-size: 9px; color: #8080a0; pointer-events: none;
+}
+
+.bkey {
+  width: 28px; height: 112px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #2a2a40 100%);
+  border: 1px solid #444; border-top: none;
+  border-radius: 0 0 5px 5px;
+  position: absolute; top: 0; z-index: 2; cursor: pointer;
+  transition: background .05s;
+  box-shadow: 2px 4px 8px rgba(0,0,0,.5);
+}
+.bkey:hover { background: linear-gradient(180deg, #2a2a44 0%, #3a3a55 100%); }
+.bkey.pressed-local {
+  background: linear-gradient(180deg, var(--accent) 0%, #007799 100%) !important;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 0 12px rgba(0,229,255,.7);
+}
+.bkey.pressed-remote {
+  background: linear-gradient(180deg, var(--accent2) 0%, #993300 100%) !important;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,.4), 0 0 12px rgba(255,107,53,.7);
+}
+
+/* active notes display */
+.active-notes {
+  padding: 8px 20px; display: flex; gap: 6px; flex-wrap: wrap;
+  min-height: 36px; align-items: center; flex-shrink: 0;
+  border-top: 1px solid var(--border); background: rgba(8,8,14,.6);
+}
+.note-tag {
+  padding: 2px 10px; border-radius: 20px;
+  font-family: 'Space Mono', monospace; font-size: 11px;
+  border: 1px solid; animation: noteIn .08s ease;
+}
+@keyframes noteIn { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* chat */
+.chat-panel {
+  height: 130px; display: flex; flex-direction: column;
+  border-top: 1px solid var(--border); background: var(--surface); flex-shrink: 0;
+}
+.chat-msgs {
+  flex: 1; overflow-y: auto; padding: 8px 16px;
+  scrollbar-width: thin; scrollbar-color: #222 transparent;
+}
+.chat-msg { font-size: 12px; line-height: 1.5; margin-bottom: 2px; }
+.chat-msg .cn { font-weight: 700; font-family: 'Space Mono', monospace; font-size: 11px; }
+.chat-row {
+  display: flex; gap: 8px; padding: 6px 12px;
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.chat-row input {
+  flex: 1; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 6px 12px; color: var(--text);
+  font-family: 'Noto Sans KR', sans-serif; font-size: 12px; outline: none;
+}
+.chat-row input:focus { border-color: var(--accent); }
+
+/* toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px);
+  background: var(--surface); border: 1px solid var(--accent);
+  border-radius: 8px; padding: 10px 20px;
+  font-family: 'Space Mono', monospace; font-size: 12px; color: var(--accent);
+  transition: transform .3s; z-index: 300; white-space: nowrap;
+  box-shadow: 0 0 20px rgba(0,229,255,.15);
+}
+.toast.show { transform: translateX(-50%) translateY(0); }
+.toast.error { border-color: var(--danger); color: var(--danger); box-shadow: 0 0 20px rgba(255,68,102,.15); }
+
+/* MIDI indicator */
+.midi-badge {
+  padding: 3px 10px; border-radius: 20px;
+  font-family: 'Space Mono', monospace; font-size: 10px;
+  border: 1px solid var(--border); color: #556;
+  transition: all .2s;
+}
+.midi-badge.active { border-color: var(--green); color: var(--green); box-shadow: 0 0 8px rgba(0,255,136,.3); }
+
+/* volume */
+.vol-row { display: flex; align-items: center; gap: 8px; font-family: 'Space Mono', monospace; font-size: 10px; color: #556; }
+.vol-row input[type=range] { width: 80px; accent-color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<!-- HEADER -->
+<header>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span></div>
+  <div style="display:flex;gap:12px;align-items:center">
+    <div class="midi-badge" id="midiBadge">NO MIDI</div>
+    <div class="conn-status">
+      <div class="dot" id="connDot"></div>
+      <span id="connLabel">연결 안됨</span>
+    </div>
+  </div>
+</header>
+
+<!-- LOBBY -->
+<div class="screen active" id="lobby">
+  <div class="hero">
+    <h1>실시간 원격<br>합주 플랫폼</h1>
+    <p>야마하 싱크룸처럼 — 어디서든 함께 연주하세요</p>
+  </div>
+
+  <div class="field" style="margin-bottom:24px">
+    <label>서버 주소 (Cloudtype WebSocket URL)</label>
+    <div style="display:flex;gap:8px">
+      <input type="text" id="serverUrl" placeholder="wss://your-app.cloudtype.app" style="flex:1">
+      <button class="btn btn-outline" onclick="connectServer()">연결</button>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <!-- CREATE ROOM -->
+    <div class="card">
+      <div class="card-title">🎹 방 만들기</div>
+      <div class="field"><label>방 이름</label><input type="text" id="createName" placeholder="My Jam Room" maxlength="40"></div>
+      <div class="field"><label>비밀번호 (선택)</label><input type="password" id="createPw" placeholder="없으면 공개방"></div>
+      <div class="field"><label>최대 인원</label>
+        <select id="createMax">
+          <option value="2">2명</option>
+          <option value="4" selected>4명</option>
+          <option value="8">8명</option>
+          <option value="16">16명</option>
+        </select>
+      </div>
+      <div class="field"><label>내 이름</label><input type="text" id="createPlayerName" placeholder="Musician" maxlength="20"></div>
+      <div class="field"><label>내 색상</label>
+        <div class="colors" id="createColors"></div>
+      </div>
+      <button class="btn btn-primary btn-full" onclick="createRoom()" id="btnCreate" disabled>방 만들기</button>
+    </div>
+
+    <!-- JOIN ROOM -->
+    <div class="card">
+      <div class="card-title">🚪 방 참가</div>
+      <div class="field"><label>방 코드 직접 입력</label>
+        <div style="display:flex;gap:8px">
+          <input type="text" id="joinCode" placeholder="ABC123" maxlength="6" style="flex:1;text-transform:uppercase">
+          <button class="btn btn-outline" onclick="joinByCode()" id="btnJoin" disabled>참가</button>
+        </div>
+      </div>
+      <div class="field"><label>내 이름</label><input type="text" id="joinPlayerName" placeholder="Musician" maxlength="20"></div>
+      <div class="field"><label>내 색상</label>
+        <div class="colors" id="joinColors"></div>
+      </div>
+
+      <div class="room-list">
+        <div class="room-list-title">공개 방 목록</div>
+        <div id="roomList"><div class="no-rooms">서버에 연결하면 방 목록이 표시됩니다</div></div>
+      </div>
+      <button class="btn btn-outline btn-full" onclick="refreshRooms()" id="btnRefresh" disabled style="margin-top:12px">새로고침</button>
+    </div>
+  </div>
+</div>
+
+<!-- SESSION -->
+<div class="screen" id="session">
+  <div class="sess-top">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="sess-room-name" id="sessRoomName">Room</div>
+      <div class="room-id-tag" id="sessRoomId" title="클릭해서 복사" onclick="copyRoomId()">------</div>
+    </div>
+    <div class="sess-controls">
+      <div class="vol-row">
+        🔊 <input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.7" oninput="setVolume(this.value)">
+      </div>
+      <button class="btn btn-outline" onclick="toggleMidiInput()" id="btnMidi">🎹 MIDI 연결</button>
+      <button class="btn btn-red" onclick="leaveRoom()">나가기</button>
+    </div>
+  </div>
+
+  <div class="players-bar" id="playersBar"></div>
+
+  <div class="latency-panel" id="latencyPanel"></div>
+
+  <div class="sess-main">
+    <div class="piano-wrap">
+      <div class="octave-controls">
+        <button class="oct-btn" onclick="changeOctave(-1)">◀</button>
+        <span class="oct-label" id="octLabel">C4</span>
+        <button class="oct-btn" onclick="changeOctave(1)">▶</button>
+      </div>
+      <div class="keyboard" id="keyboard"></div>
+    </div>
+    <div class="active-notes" id="activeNotes"></div>
+    <div class="chat-panel">
+      <div class="chat-msgs" id="chatMsgs"></div>
+      <div class="chat-row">
+        <input type="text" id="chatInput" placeholder="채팅 메시지..." maxlength="200" onkeydown="if(event.key==='Enter')sendChat()">
+        <button class="btn btn-outline" onclick="sendChat()">전송</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- wrap -->
+
+<!-- PASSWORD MODAL -->
+<div class="modal-bg" id="pwModal">
+  <div class="modal">
+    <h3>🔒 비밀번호 입력</h3>
+    <div class="field"><label>방 비밀번호</label><input type="password" id="modalPw" placeholder="Password" onkeydown="if(event.key==='Enter')confirmPw()"></div>
+    <div class="modal-btns">
+      <button class="btn btn-primary" style="flex:1" onclick="confirmPw()">참가</button>
+      <button class="btn btn-red" onclick="closePwModal()">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+let ws = null;
+let myId = null;
+let myColor = '#00e5ff';
+let currentRoomId = null;
+let pendingJoinRoom = null;
+
+let audioCtx = null;
+let masterGain = null;
+let volume = 0.7;
+let activeOscillators = new Map(); // note -> {osc, gain}
+let remoteActiveOscillators = new Map(); // `${senderId}_${note}` -> {osc, gain}
+
+let midiAccess = null;
+let midiInputConnected = false;
+
+let startOctave = 4; // C4 = MIDI 60
+const KEYS_PER_OCTAVE = 2; // octaves shown
+const TOTAL_KEYS = 24 + 1; // 2 octaves + 1
+
+let pressedLocal = new Set();
+let pressedRemote = new Map(); // note -> {color, name}
+
+// Colors
+const COLORS = ['#00e5ff','#ff6b35','#00ff88','#a855f7','#ffcc00','#ff4466','#3b82f6','#ec4899'];
+let createColorSel = '#00e5ff';
+let joinColorSel = '#ff6b35';
+
+// Latency
+let latencyMap = new Map(); // playerId -> pingMs
+let pingInterval = null;
+let lastPingTime = 0;
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+window.addEventListener('load', () => {
+  buildColorPickers();
+  buildKeyboard();
+  initAudio();
+  // restore last server url
+  const saved = localStorage.getItem('synckeys_server');
+  if (saved) document.getElementById('serverUrl').value = saved;
+});
+
+function buildColorPickers() {
+  ['createColors','joinColors'].forEach((id, i) => {
+    const el = document.getElementById(id);
+    COLORS.forEach(c => {
+      const d = document.createElement('div');
+      d.className = 'cswatch' + (c === (i === 0 ? createColorSel : joinColorSel) ? ' sel' : '');
+      d.style.background = c;
+      d.onclick = () => {
+        el.querySelectorAll('.cswatch').forEach(s => s.classList.remove('sel'));
+        d.classList.add('sel');
+        if (i === 0) createColorSel = c; else joinColorSel = c;
+        myColor = i === 0 ? createColorSel : joinColorSel;
+      };
+      el.appendChild(d);
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+//  AUDIO
+// ─────────────────────────────────────────────
+function initAudio() {
+  audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = volume;
+  masterGain.connect(audioCtx.destination);
+}
+
+function setVolume(v) { volume = parseFloat(v); if (masterGain) masterGain.gain.value = volume; }
+
+function midiToFreq(note) { return 440 * Math.pow(2, (note - 69) / 12); }
+
+function playNote(note, velocity = 100, remote = false, color = null) {
+  if (!audioCtx) return;
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const freq = midiToFreq(note);
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+
+  // add some harmonics
+  const osc2 = audioCtx.createOscillator();
+  osc2.type = 'sine';
+  osc2.frequency.value = freq * 2;
+  const gain2 = audioCtx.createGain();
+  gain2.gain.value = 0.2;
+
+  const vel = (velocity / 127) * (remote ? 0.55 : 0.7);
+  gain.gain.setValueAtTime(vel, audioCtx.currentTime);
+  gain.gain.setTargetAtTime(vel * 0.85, audioCtx.currentTime + 0.01, 0.1);
+
+  osc.connect(gain); osc2.connect(gain2);
+  gain.connect(masterGain); gain2.connect(masterGain);
+  osc.start(); osc2.start();
+
+  return { osc, osc2, gain, gain2 };
+}
+
+function stopNote(note, remote = false, senderId = null) {
+  const key = remote ? `${senderId}_${note}` : note;
+  const map = remote ? remoteActiveOscillators : activeOscillators;
+  const n = map.get(key);
+  if (!n) return;
+  const { osc, osc2, gain, gain2 } = n;
+  gain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+  gain2.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+  setTimeout(() => { try { osc.stop(); osc2.stop(); } catch {} }, 400);
+  map.delete(key);
+}
+
+// ─────────────────────────────────────────────
+//  KEYBOARD UI
+// ─────────────────────────────────────────────
+const NOTE_NAMES = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const IS_BLACK = [false,true,false,true,false,false,true,false,true,false,true,false];
+const BLACK_OFFSET = [0, 0.6, 0, 0.6, 0, 0, 0.6, 0, 0.6, 0, 0.6, 0]; // relative to white key
+
+function buildKeyboard() {
+  const kb = document.getElementById('keyboard');
+  kb.innerHTML = '';
+  const baseNote = startOctave * 12 + 12; // MIDI note for C of startOctave
+
+  // collect white keys first to compute positions
+  const whites = [];
+  for (let i = 0; i < TOTAL_KEYS; i++) {
+    const note = baseNote + i;
+    const deg = i % 12;
+    if (!IS_BLACK[deg]) whites.push({ note, i });
+  }
+
+  // keyboard width based on white keys
+  const wkW = 44; // white key width
+  kb.style.width = (whites.length * wkW) + 'px';
+
+  // build white keys
+  whites.forEach(({ note, i }, wi) => {
+    const deg = i % 12;
+    const oct = Math.floor(note / 12) - 1;
+    const name = NOTE_NAMES[deg] + oct;
+    const el = document.createElement('div');
+    el.className = 'wkey';
+    el.dataset.note = note;
+    el.style.left = (wi * wkW) + 'px';
+    el.style.position = 'absolute';
+    if (deg === 0) {
+      const lbl = document.createElement('div');
+      lbl.className = 'key-label'; lbl.textContent = name;
+      el.appendChild(lbl);
+    }
+    addKeyEvents(el, note);
+    kb.appendChild(el);
+  });
+
+  // build black keys
+  let whiteIdx = 0;
+  for (let i = 0; i < TOTAL_KEYS; i++) {
+    const note = baseNote + i;
+    const deg = i % 12;
+    if (IS_BLACK[deg]) {
+      const el = document.createElement('div');
+      el.className = 'bkey';
+      el.dataset.note = note;
+      // position: between surrounding white keys
+      const leftWIdx = whiteIdx - 1;
+      el.style.left = (leftWIdx * wkW + wkW - 14) + 'px';
+      addKeyEvents(el, note);
+      kb.appendChild(el);
+    } else {
+      whiteIdx++;
+    }
+  }
+  updateOctaveLabel();
+}
+
+function changeOctave(dir) {
+  startOctave = Math.max(0, Math.min(8, startOctave + dir));
+  buildKeyboard();
+}
+
+function updateOctaveLabel() {
+  document.getElementById('octLabel').textContent = 'C' + startOctave;
+}
+
+function addKeyEvents(el, note) {
+  el.addEventListener('mousedown', e => { e.preventDefault(); localNoteOn(note, 100); });
+  el.addEventListener('mouseup', () => localNoteOff(note));
+  el.addEventListener('mouseleave', () => { if (pressedLocal.has(note)) localNoteOff(note); });
+  el.addEventListener('touchstart', e => { e.preventDefault(); localNoteOn(note, 100); });
+  el.addEventListener('touchend', () => localNoteOff(note));
+}
+
+function getKeyEl(note) {
+  return document.querySelector(`[data-note="${note}"]`);
+}
+
+function setKeyState(note, state, isLocal) {
+  const el = getKeyEl(note);
+  if (!el) return;
+  const cls = isLocal ? 'pressed-local' : 'pressed-remote';
+  if (state) el.classList.add(cls); else el.classList.remove(cls);
+}
+
+// ─────────────────────────────────────────────
+//  LOCAL NOTE ON/OFF
+// ─────────────────────────────────────────────
+function localNoteOn(note, velocity) {
+  if (pressedLocal.has(note)) return;
+  pressedLocal.add(note);
+  setKeyState(note, true, true);
+  const n = playNote(note, velocity, false);
+  if (n) activeOscillators.set(note, n);
+  updateActiveNotes();
+  // send MIDI
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'midi', data: { type: 'noteOn', note, velocity } }));
+  }
+}
+
+function localNoteOff(note) {
+  if (!pressedLocal.has(note)) return;
+  pressedLocal.delete(note);
+  setKeyState(note, false, true);
+  stopNote(note, false);
+  updateActiveNotes();
+  if (ws && ws.readyState === 1) {
+    ws.send(JSON.stringify({ type: 'midi', data: { type: 'noteOff', note } }));
+  }
+}
+
+// ─────────────────────────────────────────────
+//  REMOTE NOTE ON/OFF
+// ─────────────────────────────────────────────
+function remoteNoteOn(note, senderId, senderName, senderColor, velocity) {
+  const key = `${senderId}_${note}`;
+  if (remoteActiveOscillators.has(key)) return;
+  setKeyState(note, true, false);
+  pressedRemote.set(note, { color: senderColor, name: senderName });
+  const n = playNote(note, velocity, true, senderColor);
+  if (n) remoteActiveOscillators.set(key, n);
+  updateActiveNotes();
+}
+
+function remoteNoteOff(note, senderId) {
+  const key = `${senderId}_${note}`;
+  setKeyState(note, false, false);
+  pressedRemote.delete(note);
+  stopNote(note, true, senderId);
+  updateActiveNotes();
+}
+
+function updateActiveNotes() {
+  const el = document.getElementById('activeNotes');
+  el.innerHTML = '';
+  pressedLocal.forEach(n => {
+    const t = document.createElement('div');
+    t.className = 'note-tag';
+    t.style.borderColor = myColor; t.style.color = myColor;
+    const deg = n % 12; const oct = Math.floor(n / 12) - 1;
+    t.textContent = NOTE_NAMES[deg] + oct;
+    el.appendChild(t);
+  });
+  pressedRemote.forEach((info, n) => {
+    const t = document.createElement('div');
+    t.className = 'note-tag';
+    t.style.borderColor = info.color; t.style.color = info.color;
+    const deg = n % 12; const oct = Math.floor(n / 12) - 1;
+    t.textContent = NOTE_NAMES[deg] + oct + ' (' + info.name + ')';
+    el.appendChild(t);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  WEBSOCKET
+// ─────────────────────────────────────────────
+function connectServer() {
+  const url = document.getElementById('serverUrl').value.trim();
+  if (!url) { toast('서버 주소를 입력하세요', true); return; }
+  localStorage.setItem('synckeys_server', url);
+
+  if (ws) { ws.close(); ws = null; }
+
+  setConnStatus('connecting');
+  try {
+    ws = new WebSocket(url);
+  } catch(e) { toast('잘못된 URL 형식입니다', true); return; }
+
+  ws.onopen = () => {
+    setConnStatus('ok');
+    toast('서버 연결 완료!');
+    ['btnCreate','btnJoin','btnRefresh'].forEach(id => document.getElementById(id).disabled = false);
+    refreshRooms();
+    startPing();
+  };
+
+  ws.onclose = () => {
+    setConnStatus('err');
+    toast('연결이 끊겼습니다', true);
+    ['btnCreate','btnJoin','btnRefresh'].forEach(id => document.getElementById(id).disabled = true);
+    stopPing();
+  };
+
+  ws.onerror = () => { toast('연결 오류', true); };
+
+  ws.onmessage = e => {
+    let msg;
+    try { msg = JSON.parse(e.data); } catch { return; }
+    handleMsg(msg);
+  };
+}
+
+function handleMsg(msg) {
+  switch (msg.type) {
+    case 'room_joined':
+      myId = msg.clientId;
+      currentRoomId = msg.roomId;
+      document.getElementById('sessRoomId').textContent = msg.roomId;
+      document.getElementById('sessRoomName').textContent = msg.roomInfo.name;
+      updatePlayers(msg.roomInfo.players);
+      showScreen('session');
+      toast('방에 입장했습니다!');
+      break;
+
+    case 'player_joined':
+      updatePlayers(msg.roomInfo.players);
+      addChat(null, `${msg.player.name}님이 입장했습니다`, msg.player.color);
+      break;
+
+    case 'player_left':
+      updatePlayers(msg.roomInfo.players);
+      addChat(null, `${msg.playerName}님이 퇴장했습니다`, '#556');
+      // clear their notes
+      for (const [key] of remoteActiveOscillators) {
+        if (key.startsWith(msg.playerId + '_')) {
+          const note = parseInt(key.split('_')[1]);
+          remoteNoteOff(note, msg.playerId);
+        }
+      }
+      break;
+
+    case 'midi':
+      if (msg.data.type === 'noteOn') {
+        remoteNoteOn(msg.data.note, msg.senderId, msg.senderName, msg.senderColor, msg.data.velocity);
+      } else if (msg.data.type === 'noteOff') {
+        remoteNoteOff(msg.data.note, msg.senderId);
+      }
+      break;
+
+    case 'pong': {
+      const rtt = Date.now() - msg.clientTime;
+      if (ws && ws.readyState === 1) {
+        ws.send(JSON.stringify({ type: 'latency_report', pingMs: rtt }));
+      }
+      updateMyLatency(rtt);
+      break;
+    }
+
+    case 'latency_update':
+      latencyMap.set(msg.playerId, msg.pingMs);
+      renderLatency();
+      break;
+
+    case 'room_list':
+      renderRoomList(msg.rooms);
+      break;
+
+    case 'chat':
+      addChat(msg.senderName, msg.message, msg.senderColor);
+      break;
+
+    case 'error':
+      toast(msg.message, true);
+      break;
+  }
+}
+
+// ─────────────────────────────────────────────
+//  ROOM ACTIONS
+// ─────────────────────────────────────────────
+function createRoom() {
+  if (!ws || ws.readyState !== 1) { toast('서버에 연결하세요', true); return; }
+  myColor = createColorSel;
+  ws.send(JSON.stringify({
+    type: 'create_room',
+    name: document.getElementById('createName').value || 'My Room',
+    password: document.getElementById('createPw').value,
+    maxPlayers: parseInt(document.getElementById('createMax').value),
+    playerName: document.getElementById('createPlayerName').value || 'Host',
+    color: myColor,
+  }));
+}
+
+function joinByCode() {
+  const code = document.getElementById('joinCode').value.trim().toUpperCase();
+  if (!code) { toast('방 코드를 입력하세요', true); return; }
+  pendingJoinRoom = { id: code, hasPassword: false };
+  attemptJoin(code, '');
+}
+
+function joinRoom(room) {
+  pendingJoinRoom = room;
+  if (room.hasPassword) {
+    document.getElementById('pwModal').classList.add('open');
+    setTimeout(() => document.getElementById('modalPw').focus(), 100);
+  } else {
+    attemptJoin(room.id, '');
+  }
+}
+
+function confirmPw() {
+  const pw = document.getElementById('modalPw').value;
+  closePwModal();
+  attemptJoin(pendingJoinRoom.id, pw);
+}
+
+function closePwModal() {
+  document.getElementById('pwModal').classList.remove('open');
+  document.getElementById('modalPw').value = '';
+}
+
+function attemptJoin(roomId, password) {
+  if (!ws || ws.readyState !== 1) { toast('서버에 연결하세요', true); return; }
+  myColor = joinColorSel;
+  ws.send(JSON.stringify({
+    type: 'join_room', roomId, password,
+    playerName: document.getElementById('joinPlayerName').value || 'Musician',
+    color: myColor,
+  }));
+}
+
+function leaveRoom() {
+  // release all notes
+  pressedLocal.forEach(n => localNoteOff(n));
+  pressedRemote.clear();
+  activeOscillators.clear();
+  remoteActiveOscillators.clear();
+  updateActiveNotes();
+
+  if (ws) ws.close();
+  ws = null;
+  currentRoomId = null;
+  myId = null;
+  latencyMap.clear();
+  setConnStatus('');
+  showScreen('lobby');
+  ['btnCreate','btnJoin','btnRefresh'].forEach(id => document.getElementById(id).disabled = true);
+  document.getElementById('roomList').innerHTML = '<div class="no-rooms">서버에 연결하면 방 목록이 표시됩니다</div>';
+}
+
+function refreshRooms() {
+  if (!ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: 'get_rooms' }));
+}
+
+function renderRoomList(rooms) {
+  const el = document.getElementById('roomList');
+  if (!rooms.length) { el.innerHTML = '<div class="no-rooms">현재 열려있는 방이 없습니다</div>'; return; }
+  el.innerHTML = '';
+  rooms.forEach(r => {
+    const d = document.createElement('div');
+    d.className = 'room-item';
+    const full = r.players >= r.maxPlayers;
+    d.innerHTML = `
+      <div class="room-item-left">
+        <div class="room-item-name">${escHtml(r.name)}</div>
+        <div class="room-item-meta">${r.id} · ${r.players}/${r.maxPlayers}명</div>
+      </div>
+      <div class="room-badges">
+        ${r.hasPassword ? '<span class="badge badge-lock">🔒 비번</span>' : ''}
+        ${full ? '<span class="badge badge-full">FULL</span>' : ''}
+      </div>`;
+    if (!full) d.onclick = () => joinRoom(r);
+    el.appendChild(d);
+  });
+}
+
+function copyRoomId() {
+  navigator.clipboard.writeText(document.getElementById('sessRoomId').textContent)
+    .then(() => toast('방 코드 복사됨!'));
+}
+
+// ─────────────────────────────────────────────
+//  PLAYERS + LATENCY
+// ─────────────────────────────────────────────
+let playerMap = new Map(); // id -> {name, color}
+
+function updatePlayers(players) {
+  playerMap.clear();
+  players.forEach(p => playerMap.set(p.id, p));
+  renderPlayers();
+  renderLatency();
+}
+
+function renderPlayers() {
+  const el = document.getElementById('playersBar');
+  el.innerHTML = '';
+  for (const [id, p] of playerMap) {
+    const chip = document.createElement('div');
+    chip.className = 'player-chip';
+    const ping = latencyMap.get(id) || 0;
+    chip.innerHTML = `
+      <div class="player-dot" style="background:${p.color};box-shadow:0 0 6px ${p.color}"></div>
+      <span>${escHtml(p.name)}</span>
+      <span class="player-ping">${ping}ms</span>
+      ${id === myId ? '<span style="font-size:10px;color:#556">(나)</span>' : ''}`;
+    el.appendChild(chip);
+  }
+}
+
+function renderLatency() {
+  const el = document.getElementById('latencyPanel');
+  el.innerHTML = '<span style="font-family:Space Mono,monospace;font-size:10px;color:#446;margin-right:4px">LATENCY</span>';
+  for (const [id, p] of playerMap) {
+    const ms = latencyMap.get(id) || 0;
+    const pct = Math.min(100, ms / 3); // 300ms = 100%
+    const col = ms < 50 ? '#00ff88' : ms < 120 ? '#ffcc00' : '#ff4466';
+    const item = document.createElement('div');
+    item.className = 'lat-item';
+    item.innerHTML = `
+      <div class="player-dot" style="background:${p.color};width:6px;height:6px"></div>
+      <span style="color:#778;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(p.name)}</span>
+      <div class="lat-bar"><div class="lat-fill" style="width:${pct}%;background:${col}"></div></div>
+      <span class="lat-ms" style="color:${col}">${ms}ms</span>`;
+    el.appendChild(item);
+  }
+}
+
+function updateMyLatency(ms) {
+  if (myId) { latencyMap.set(myId, ms); renderPlayers(); renderLatency(); }
+}
+
+// ─────────────────────────────────────────────
+//  PING
+// ─────────────────────────────────────────────
+function startPing() {
+  stopPing();
+  pingInterval = setInterval(() => {
+    if (ws && ws.readyState === 1) {
+      lastPingTime = Date.now();
+      ws.send(JSON.stringify({ type: 'ping', clientTime: lastPingTime }));
+    }
+  }, 2000);
+}
+function stopPing() { if (pingInterval) { clearInterval(pingInterval); pingInterval = null; } }
+
+// ─────────────────────────────────────────────
+//  MIDI INPUT
+// ─────────────────────────────────────────────
+async function toggleMidiInput() {
+  if (midiInputConnected) {
+    disconnectMidi();
+    return;
+  }
+  if (!navigator.requestMIDIAccess) { toast('이 브라우저는 Web MIDI를 지원하지 않습니다', true); return; }
+  try {
+    midiAccess = await navigator.requestMIDIAccess();
+    connectMidi();
+  } catch(e) { toast('MIDI 권한이 거부되었습니다', true); }
+}
+
+function connectMidi() {
+  if (!midiAccess) return;
+  for (const input of midiAccess.inputs.values()) {
+    input.onmidimessage = onMidiMessage;
+  }
+  midiInputConnected = true;
+  document.getElementById('btnMidi').textContent = '🎹 MIDI 연결됨';
+  document.getElementById('btnMidi').className = 'btn btn-primary';
+  document.getElementById('midiBadge').textContent = 'MIDI ON';
+  document.getElementById('midiBadge').classList.add('active');
+  toast('MIDI 키보드 연결됨');
+}
+
+function disconnectMidi() {
+  if (midiAccess) {
+    for (const input of midiAccess.inputs.values()) input.onmidimessage = null;
+  }
+  midiInputConnected = false;
+  document.getElementById('btnMidi').textContent = '🎹 MIDI 연결';
+  document.getElementById('btnMidi').className = 'btn btn-outline';
+  document.getElementById('midiBadge').textContent = 'NO MIDI';
+  document.getElementById('midiBadge').classList.remove('active');
+}
+
+function onMidiMessage(event) {
+  const [status, note, velocity] = event.data;
+  const cmd = status & 0xf0;
+  if (cmd === 0x90 && velocity > 0) localNoteOn(note, velocity);
+  else if (cmd === 0x80 || (cmd === 0x90 && velocity === 0)) localNoteOff(note);
+}
+
+// ─────────────────────────────────────────────
+//  CHAT
+// ─────────────────────────────────────────────
+function sendChat() {
+  const inp = document.getElementById('chatInput');
+  const msg = inp.value.trim();
+  if (!msg) return;
+  if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'chat', message: msg }));
+  inp.value = '';
+}
+
+function addChat(name, message, color) {
+  const el = document.getElementById('chatMsgs');
+  const d = document.createElement('div');
+  d.className = 'chat-msg';
+  if (name) {
+    d.innerHTML = `<span class="cn" style="color:${color}">${escHtml(name)}</span> <span style="color:#9090b0">${escHtml(message)}</span>`;
+  } else {
+    d.innerHTML = `<span style="color:${color || '#446'};font-style:italic">${escHtml(message)}</span>`;
+  }
+  el.appendChild(d);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ─────────────────────────────────────────────
+//  KEYBOARD SHORTCUTS
+// ─────────────────────────────────────────────
+const KB_MAP = {
+  'a':60,'w':61,'s':62,'e':63,'d':64,'f':65,'t':66,'g':67,'y':68,'h':69,'u':70,'j':71,
+  'k':72,'o':73,'l':74,'p':75,';':76
+};
+const heldKeys = new Set();
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT') return;
+  if (heldKeys.has(e.key)) return;
+  heldKeys.add(e.key);
+  const note = KB_MAP[e.key.toLowerCase()];
+  if (note !== undefined) localNoteOn(note, 100);
+  if (e.key === 'ArrowLeft') changeOctave(-1);
+  if (e.key === 'ArrowRight') changeOctave(1);
+});
+document.addEventListener('keyup', e => {
+  heldKeys.delete(e.key);
+  const note = KB_MAP[e.key.toLowerCase()];
+  if (note !== undefined) localNoteOff(note);
+});
+
+// ─────────────────────────────────────────────
+//  UI HELPERS
+// ─────────────────────────────────────────────
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+}
+
+function setConnStatus(s) {
+  const dot = document.getElementById('connDot');
+  const lbl = document.getElementById('connLabel');
+  dot.className = 'dot ' + (s === 'ok' ? 'ok' : s === 'err' ? 'err' : '');
+  lbl.textContent = s === 'ok' ? '연결됨' : s === 'err' ? '연결 끊김' : s === 'connecting' ? '연결 중...' : '연결 안됨';
+}
+
+let toastTimer = null;
+function toast(msg, isErr = false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isErr ? ' error' : '');
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
