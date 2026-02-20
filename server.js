@@ -1,6 +1,8 @@
 const WebSocket = require('ws');
 const http = require('http');
 const crypto = require('crypto');
+const fs = require('fs'); // 파일 읽기 도구 추가
+const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 
@@ -10,7 +12,20 @@ const server = http.createServer((req, res) => {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
 
-  if (req.url === '/health') {
+  // ── 추가된 로직: 접속 시 index.html 파일을 화면에 표시 ──
+  if (req.url === '/' || req.url === '/index.html') {
+    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
+      if (err) {
+        res.writeHead(500);
+        res.end('index.html 파일을 찾을 수 없습니다.');
+        return;
+      }
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end(data);
+    });
+  } 
+  // ── 기존 헬스체크 및 룸 리스트 API 유지 ──
+  else if (req.url === '/health') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ status: 'ok', rooms: rooms.size, timestamp: Date.now() }));
   } else if (req.url === '/rooms') {
@@ -27,6 +42,8 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 const rooms = new Map();
+
+// --- 여기서부터는 사용자님의 기존 MIDI 로직과 동일합니다 ---
 
 function broadcast(room, message, excludeWs = null) {
   const data = JSON.stringify(message);
