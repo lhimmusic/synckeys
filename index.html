@@ -141,7 +141,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v5</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v6</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -308,6 +308,7 @@ function tryConnect(url){
 }
 function updateBanner(state,text){
   const b=document.getElementById('serverBanner'),d=document.getElementById('bannerDot'),t=document.getElementById('bannerText');
+  b.style.display = state==='ok' ? 'none' : 'flex';
   b.className='server-banner '+state;
   d.className='dot '+(state==='ok'?'ok':state==='err'?'err':'');
   t.textContent=text||(state==='connecting'?'서버 자동 연결 중...':'');
@@ -328,7 +329,7 @@ function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=v
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
-  if(audioCtx.state==='suspended') audioCtx.resume();
+  if(audioCtx.state==='suspended') return null;
   const f=midiToFreq(note);
   const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();
   const g1=audioCtx.createGain(),g2=audioCtx.createGain();
@@ -478,6 +479,10 @@ function updateViewLabel(){
 document.getElementById('pianoScroll').addEventListener('scroll',updateViewLabel);
 
 function localNoteOn(note,vel){
+  if(!audioCtx||audioCtx.state==='suspended'){
+    ensureAudioReady().then(()=>localNoteOn(note,vel));
+    return;
+  }
   heldLocalNotes.add(note);
   if(pressedLocal.has(note))return;
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
@@ -554,7 +559,10 @@ function handleMsg(msg){
       for(const[key]of remoteOsc){if(key.startsWith(msg.playerId+'_')){remoteNoteOff(parseInt(key.split('_')[1]),msg.playerId);}}
       break;
     case 'midi':
-      if(msg.data.type==='noteOn')remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,msg.senderColor,msg.data.velocity);
+      if(msg.data.type==='noteOn'){
+        const c=msg.senderColor||(playerMap.has(msg.senderId)?playerMap.get(msg.senderId).color:'#ff6b35');
+        remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,c,msg.data.velocity);
+      }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
       break;
     case 'color_changed':
