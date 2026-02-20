@@ -12,15 +12,23 @@ const server = http.createServer((req, res) => {
   
   // 주소 접속 시 index.html 파일을 읽어서 보내줌
   if (req.url === '/' || req.url === '/index.html') {
-    fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
-      if (err) {
+    const candidates = ['index.html', 'index (1).html'];
+    let served = false;
+    const tryRead = (idx) => {
+      if (idx >= candidates.length) {
         res.writeHead(500);
         res.end('Error: index.html not found');
         return;
       }
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(data);
-    });
+      fs.readFile(path.join(__dirname, candidates[idx]), (err, data) => {
+        if (err) return tryRead(idx + 1);
+        if (served) return;
+        served = true;
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(data);
+      });
+    };
+    tryRead(0);
   } 
   // 헬스체크용 API
   else if (req.url === '/health') {
@@ -34,6 +42,7 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 const rooms = new Map();
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 function broadcast(room, message, excludeWs = null) {
   const data = JSON.stringify(message);
@@ -50,10 +59,28 @@ function getRoomInfo(room) {
   return { name: room.name, players };
 }
 
+function safeColor(value, fallback = '#00e5ff') {
+  return typeof value === 'string' && HEX_COLOR_RE.test(value) ? value : fallback;
+}
+
 wss.on('connection', (ws) => {
   let currentRoom = null;
   const clientId = crypto.randomUUID();
   let clientInfo = { id: clientId, name: 'Musician', color: '#00e5ff', pingMs: 0 };
+
+  function leaveCurrentRoom(sendAck = false) {
+    if (!currentRoom) return;
+    const room = rooms.get(currentRoom);
+    if (!room) { currentRoom = null; return; }
+    room.clients.delete(ws);
+    if (room.clients.size === 0) {
+      rooms.delete(currentRoom);
+    } else {
+      broadcast(room, { type: 'player_left', playerId: clientId, playerName: clientInfo.name, roomInfo: getRoomInfo(room) });
+    }
+    currentRoom = null;
+    if (sendAck && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'left_room' }));
+  }
 
   ws.on('message', (raw) => {
     let msg;
@@ -66,7 +93,7 @@ wss.on('connection', (ws) => {
         rooms.set(roomId, room);
         currentRoom = roomId;
         clientInfo.name = (msg.playerName || 'Host').slice(0, 20);
-        clientInfo.color = msg.color || '#00e5ff';
+        clientInfo.color = safeColor(msg.color, '#00e5ff');
         room.clients.set(ws, clientInfo);
         ws.send(JSON.stringify({ type: 'room_joined', roomId, clientId, roomInfo: getRoomInfo(room) }));
         break;
@@ -78,7 +105,7 @@ wss.on('connection', (ws) => {
         if (room.clients.size >= room.maxPlayers) { ws.send(JSON.stringify({ type: 'error', message: '방이 가득 찼습니다.' })); return; }
         currentRoom = msg.roomId;
         clientInfo.name = (msg.playerName || 'Musician').slice(0, 20);
-        clientInfo.color = msg.color || '#ff6b35';
+        clientInfo.color = safeColor(msg.color, '#ff6b35');
         room.clients.set(ws, clientInfo);
         ws.send(JSON.stringify({ type: 'room_joined', roomId: msg.roomId, clientId, roomInfo: getRoomInfo(room) }));
         broadcast(room, { type: 'player_joined', player: clientInfo, roomInfo: getRoomInfo(room) }, ws);
@@ -106,16 +133,35 @@ wss.on('connection', (ws) => {
         if (room) broadcast(room, { type: 'chat', senderId: clientId, senderName: clientInfo.name, senderColor: clientInfo.color, message: (msg.message || '').slice(0, 200) }, null);
         break;
       }
+      case 'color_change': {
+        if (!currentRoom) return;
+        const room = rooms.get(currentRoom);
+        if (!room || !room.clients.has(ws)) return;
+        const nextColor = safeColor(msg.color, clientInfo.color);
+        clientInfo.color = nextColor;
+        room.clients.set(ws, clientInfo);
+        broadcast(room, { type: 'color_changed', playerId: clientId, color: nextColor }, null);
+        break;
+      }
+      case 'latency_report': {
+        if (!currentRoom) return;
+        const room = rooms.get(currentRoom);
+        if (!room || !room.clients.has(ws)) return;
+        const pingMs = Math.max(0, Math.min(9999, Number(msg.pingMs) || 0));
+        clientInfo.pingMs = pingMs;
+        room.clients.set(ws, clientInfo);
+        broadcast(room, { type: 'latency_update', playerId: clientId, pingMs }, null);
+        break;
+      }
+      case 'leave_room': {
+        leaveCurrentRoom(true);
+        break;
+      }
     }
   });
 
   ws.on('close', () => {
-    if (!currentRoom) return;
-    const room = rooms.get(currentRoom);
-    if (!room) return;
-    room.clients.delete(ws);
-    if (room.clients.size === 0) rooms.delete(currentRoom);
-    else broadcast(room, { type: 'player_left', playerId: clientId, playerName: clientInfo.name, roomInfo: getRoomInfo(room) });
+    leaveCurrentRoom(false);
   });
 });
 
