@@ -89,6 +89,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .sess-controls{display:flex;align-items:center;gap:10px;}
 .vol-row{display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:10px;color:#556;}
 .vol-row input[type=range]{width:80px;accent-color:var(--accent);}
+.midi-route{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:10px;color:#6c789a;}
+.midi-route select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;max-width:160px;}
 .players-bar{display:flex;gap:8px;padding:8px 20px;background:rgba(8,8,14,.6);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;justify-content:center;flex-shrink:0;}
 .player-chip{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:12px;transition:border-color .2s;}
 .player-chip.mine{cursor:pointer;border-style:dashed;}
@@ -147,7 +149,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v23</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -201,6 +203,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     </div>
     <div class="sess-controls">
       <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.2" oninput="setVolume(this.value)"></div>
+      <div class="midi-route">OUT
+        <select id="midiOutSel" onchange="applyMidiRoutingFromUi()">
+          <option value="">없음</option>
+        </select>
+      </div>
+      <div class="midi-route">CH
+        <select id="midiChSel" onchange="applyMidiRoutingFromUi()"></select>
+      </div>
       <button class="btn btn-outline" onclick="panicAllNotes()">패닉</button>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
@@ -255,6 +265,8 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let midiOutputs=[];
 const recentOutboundMidi=new Map();
+let selectedMidiOutId='';
+let midiOutChannel=1;
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let roomListAutoTimer=null;
@@ -276,6 +288,7 @@ window.addEventListener('load',()=>{
   buildColorPickers();
   buildKeyboard88();
   buildLobbyKeyboard88();
+  buildMidiRoutingUi();
   autoConnect();
   buildPopoverSwatches();
   autoEnableMidi();
@@ -339,16 +352,61 @@ function isRecentOutboundMidi(s,n,v){
   const key=(s&0xf0)+'_'+n+'_'+v;
   const t=recentOutboundMidi.get(key);
   if(!t) return false;
-  if(Date.now()-t>80){recentOutboundMidi.delete(key);return false;}
+  if(Date.now()-t>180){recentOutboundMidi.delete(key);return false;}
   return true;
+}
+function getTargetMidiOutputs(){
+  if(!midiOutputs.length) return [];
+  if(selectedMidiOutId){
+    const one=midiOutputs.find(o=>o.id===selectedMidiOutId);
+    return one?[one]:[];
+  }
+  return [];
+}
+function buildMidiRoutingUi(){
+  const chSel=document.getElementById('midiChSel');
+  if(chSel && chSel.options.length===0){
+    for(let ch=1;ch<=16;ch++){
+      const opt=document.createElement('option');
+      opt.value=String(ch);
+      opt.textContent=String(ch);
+      chSel.appendChild(opt);
+    }
+  }
+  if(chSel) chSel.value=String(midiOutChannel);
+}
+function applyMidiRoutingFromUi(){
+  const outSel=document.getElementById('midiOutSel');
+  const chSel=document.getElementById('midiChSel');
+  if(outSel) selectedMidiOutId=outSel.value||'';
+  if(chSel){
+    const v=parseInt(chSel.value,10);
+    midiOutChannel=(Number.isFinite(v)&&v>=1&&v<=16)?v:1;
+  }
 }
 function refreshMidiOutputs(){
   if(!midiAccess){midiOutputs=[];return;}
   midiOutputs=[...midiAccess.outputs.values()];
+  const outSel=document.getElementById('midiOutSel');
+  if(!outSel) return;
+  outSel.innerHTML='';
+  const noneOpt=document.createElement('option');
+  noneOpt.value='';noneOpt.textContent='없음';
+  outSel.appendChild(noneOpt);
+  for(const out of midiOutputs){
+    const opt=document.createElement('option');
+    opt.value=out.id;
+    opt.textContent=out.name||('MIDI OUT '+out.id.slice(0,4));
+    outSel.appendChild(opt);
+  }
+  if(!selectedMidiOutId && midiOutputs.length) selectedMidiOutId=midiOutputs[0].id;
+  if(selectedMidiOutId && !midiOutputs.find(o=>o.id===selectedMidiOutId)) selectedMidiOutId='';
+  outSel.value=selectedMidiOutId;
 }
 function sendAllNotesOffToDaw(){
-  if(!midiOutputs.length) return;
-  for(const out of midiOutputs){
+  const targets=getTargetMidiOutputs();
+  if(!targets.length) return;
+  for(const out of targets){
     try{
       for(let ch=0;ch<16;ch++){
         out.send([0xB0+ch,123,0]); // all notes off
@@ -358,10 +416,12 @@ function sendAllNotesOffToDaw(){
   }
 }
 function sendMidiToDaw(status,data1,data2=0){
-  if(!midiOutputs.length) return;
-  const s=status&0xff,d1=data1&0x7f,d2=data2&0x7f;
+  const targets=getTargetMidiOutputs();
+  if(!targets.length) return;
+  const channel=((midiOutChannel-1)&0x0f);
+  const s=((status&0xf0)|channel)&0xff,d1=data1&0x7f,d2=data2&0x7f;
   markOutboundMidi(s,d1,d2);
-  for(const out of midiOutputs){
+  for(const out of targets){
     try{out.send([s,d1,d2]);}catch{}
   }
 }
