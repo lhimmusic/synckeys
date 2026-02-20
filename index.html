@@ -141,7 +141,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v2</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v3</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -155,6 +155,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   </div>
   <div class="server-banner" id="serverBanner">
     <div class="dot" id="bannerDot"></div><span id="bannerText">서버에 자동 연결 중...</span>
+  </div>
+  <div class="card lobby-piano-card">
+    <div class="lobby-piano-title">LOBBY KEYBOARD</div>
+    <div class="lobby-piano-scroll" id="lobbyPianoScroll">
+      <div class="keyboard" id="lobbyKeyboard"></div>
+    </div>
   </div>
   <div class="grid2">
     <div class="card">
@@ -195,7 +201,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     </div>
     <div class="sess-controls">
       <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.7" oninput="setVolume(this.value)"></div>
-      <button class="btn btn-outline" onclick="toggleMidiInput()" id="btnMidi">🎹 MIDI 연결</button>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
   </div>
@@ -203,12 +208,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="latency-panel" id="latencyPanel"></div>
   <div class="sess-main">
     <div class="piano-area">
-      <div class="piano-toolbar">
-        <button class="oct-btn" onclick="scrollOctave(-1)">◀</button>
-        <span class="view-label" id="viewLabel">C4</span>
-        <button class="oct-btn" onclick="scrollOctave(1)">▶</button>
-        <span class="scroll-hint">← 스크롤로 전체 88건반 탐색 →</span>
-      </div>
       <div class="piano-scroll" id="pianoScroll">
         <div class="keyboard" id="keyboard"></div>
       </div>
@@ -255,7 +254,11 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
-let autoEnterOnFirstConnect=true;
+let midiAutoAttempted=false;
+let mouseDragActive=false,dragCurrentNote=null;
+let sustainPedalDown=false;
+let heldLocalNotes=new Set();
+let sustainedNotes=new Set();
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -267,8 +270,10 @@ let createColorSel='#00e5ff',joinColorSel='#ff6b35';
 window.addEventListener('load',()=>{
   buildColorPickers();
   buildKeyboard88();
+  buildLobbyKeyboard88();
   autoConnect();
   buildPopoverSwatches();
+  autoEnableMidi();
 });
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
@@ -289,10 +294,6 @@ function tryConnect(url){
     setConnStatus('ok');
     ['btnCreate','btnJoin','btnRefresh'].forEach(id=>document.getElementById(id).disabled=false);
     refreshRooms(); startPing();
-    if(!currentRoomId && autoEnterOnFirstConnect){
-      autoEnterOnFirstConnect=false;
-      createInstantRoom();
-    }
   };
   ws.onclose=()=>{
     updateBanner('err','연결 끊김');
@@ -315,6 +316,12 @@ function initAudio(){
   if(audioCtx) return;
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   masterGain=audioCtx.createGain(); masterGain.gain.value=volume; masterGain.connect(audioCtx.destination);
+}
+async function ensureAudioReady(){
+  if(!audioCtx) initAudio();
+  if(audioCtx && audioCtx.state==='suspended'){
+    try{await audioCtx.resume();}catch{}
+  }
 }
 function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=volume;}
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
@@ -363,39 +370,77 @@ function buildKeyboard88(){
   }
   setTimeout(()=>scrollToNote(60),120);
 }
-function getKeyEl(n){return document.querySelector('[data-note="'+n+'"]');}
+function buildLobbyKeyboard88(){
+  const src=document.getElementById('keyboard');
+  const dst=document.getElementById('lobbyKeyboard');
+  if(!src||!dst) return;
+  dst.innerHTML=src.innerHTML;
+  dst.style.width=src.style.width;
+  dst.style.height=src.style.height;
+  dst.querySelectorAll('.wkey,.bkey').forEach(el=>{el.style.pointerEvents='none';});
+  const sc=document.getElementById('lobbyPianoScroll');
+  if(sc) sc.scrollLeft=Math.max(0,parseInt(src.style.width,10)/2-sc.clientWidth/2);
+}
+function getKeyEl(n,rootId='keyboard'){
+  const root=document.getElementById(rootId);
+  if(!root) return null;
+  return root.querySelector('[data-note="'+n+'"]');
+}
 function setKeyVisual(note,on,isLocal,color){
-  const el=getKeyEl(note);if(!el)return;
-  if(isLocal){
-    if(on)el.classList.add('pressed-local');else el.classList.remove('pressed-local');
-  } else {
-    if(on&&color){
-      el.classList.add('pressed-remote');
-      el.style.background='linear-gradient(180deg,'+color+' 0%,'+darken(color)+' 100%)';
-      el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99';
+  ['keyboard','lobbyKeyboard'].forEach(rootId=>{
+    const el=getKeyEl(note,rootId);if(!el)return;
+    if(isLocal){
+      if(on)el.classList.add('pressed-local');else el.classList.remove('pressed-local');
     } else {
-      el.classList.remove('pressed-remote');
-      el.style.background='';el.style.boxShadow='';
+      if(on&&color){
+        el.classList.add('pressed-remote');
+        el.style.background='linear-gradient(180deg,'+color+' 0%,'+darken(color)+' 100%)';
+        el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99';
+      } else {
+        el.classList.remove('pressed-remote');
+        el.style.background='';el.style.boxShadow='';
+      }
     }
-  }
+  });
 }
 function darken(hex){
   const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
   return'rgb('+Math.floor(r*.5)+','+Math.floor(g*.5)+','+Math.floor(b*.5)+')';
 }
 function addKeyEvents(el,note){
-  el.addEventListener('mousedown',e=>{e.preventDefault();localNoteOn(note,100);});
-  el.addEventListener('mouseup',()=>localNoteOff(note));
-  el.addEventListener('mouseleave',()=>{if(pressedLocal.has(note))localNoteOff(note);});
-  el.addEventListener('touchstart',e=>{e.preventDefault();localNoteOn(note,100);},{passive:false});
+  el.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    ensureAudioReady().then(()=>{
+      mouseDragActive=true;
+      dragCurrentNote=null;
+      dragToNote(note);
+    });
+  });
+  el.addEventListener('mouseenter',()=>{if(mouseDragActive)dragToNote(note);});
+  el.addEventListener('mouseup',endMouseDrag);
+  el.addEventListener('touchstart',e=>{e.preventDefault();ensureAudioReady().then(()=>localNoteOn(note,100));},{passive:false});
   el.addEventListener('touchend',()=>localNoteOff(note));
 }
+function dragToNote(note){
+  if(dragCurrentNote===note)return;
+  if(dragCurrentNote!==null)localNoteOff(dragCurrentNote,true);
+  localNoteOn(note,100);
+  dragCurrentNote=note;
+}
+function endMouseDrag(){
+  if(!mouseDragActive)return;
+  mouseDragActive=false;
+  if(dragCurrentNote!==null)localNoteOff(dragCurrentNote,true);
+  dragCurrentNote=null;
+}
+document.addEventListener('mouseup',endMouseDrag);
+window.addEventListener('blur',endMouseDrag);
 function scrollOctave(dir){
   document.getElementById('pianoScroll').scrollBy({left:dir*7*WKW,behavior:'smooth'});
   setTimeout(updateViewLabel,300);
 }
 function scrollToNote(n){
-  const sc=document.getElementById('pianoScroll'),el=getKeyEl(n);if(!el)return;
+  const sc=document.getElementById('pianoScroll'),el=getKeyEl(n,'keyboard');if(!el)return;
   sc.scrollLeft=parseInt(el.style.left)-sc.clientWidth/2+WKW/2;
   setTimeout(updateViewLabel,200);
 }
@@ -405,22 +450,42 @@ function updateViewLabel(){
   for(const [n,x] of Object.entries(whiteX)){
     const d=Math.abs(x-cx);if(d<bestDist){bestDist=d;best=parseInt(n);}
   }
-  document.getElementById('viewLabel').textContent=NOTE_NAMES[best%12]+(Math.floor(best/12)-1);
+  const label=document.getElementById('viewLabel');
+  if(label)label.textContent=NOTE_NAMES[best%12]+(Math.floor(best/12)-1);
 }
 document.getElementById('pianoScroll').addEventListener('scroll',updateViewLabel);
 
 function localNoteOn(note,vel){
+  heldLocalNotes.add(note);
   if(pressedLocal.has(note))return;
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
   const n=playNote(note,vel,false);if(n)activeOsc.set(note,n);
+  sustainedNotes.delete(note);
   updateActiveNotes();
   if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOn',note,velocity:vel}}));
 }
-function localNoteOff(note){
+function stopLocalNoteNow(note){
   if(!pressedLocal.has(note))return;
   pressedLocal.delete(note);setKeyVisual(note,false,true,null);
   killNote(note,activeOsc);updateActiveNotes();
+  sustainedNotes.delete(note);
   if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
+}
+function localNoteOff(note,fromPhysical=true){
+  if(fromPhysical) heldLocalNotes.delete(note);
+  if(sustainPedalDown && fromPhysical){
+    if(pressedLocal.has(note)) sustainedNotes.add(note);
+    setKeyVisual(note,false,true,null);
+    return;
+  }
+  stopLocalNoteNow(note);
+}
+function setSustainPedal(isDown){
+  sustainPedalDown=isDown;
+  if(sustainPedalDown) return;
+  for(const note of Array.from(sustainedNotes)){
+    if(!heldLocalNotes.has(note)) stopLocalNoteNow(note);
+  }
 }
 function remoteNoteOn(note,sid,sname,scolor,vel){
   if(!pressedRemote.has(note))pressedRemote.set(note,[]);
@@ -487,23 +552,9 @@ function handleMsg(msg){
   }
 }
 
-function createInstantRoom(){
-  if(!ws||ws.readyState!==1)return;
-  myColor=createColorSel;
-  myName='Musician';
-  ws.send(JSON.stringify({
-    type:'create_room',
-    name:'Instant Practice',
-    password:'',
-    maxPlayers:8,
-    playerName:myName,
-    color:myColor
-  }));
-}
-
 function createRoom(){
   if(!ws||ws.readyState!==1){toast('서버 연결 필요',true);return;}
-  myColor=createColorSel;myName=document.getElementById('createPlayerName').value||'Host';
+  myColor=createColorSel;myName=document.getElementById('createPlayerName').value||'Musician';
   ws.send(JSON.stringify({type:'create_room',name:document.getElementById('createName').value||'Room',
     password:document.getElementById('createPw').value,maxPlayers:parseInt(document.getElementById('createMax').value),
     playerName:myName,color:myColor}));
@@ -527,13 +578,13 @@ function attemptJoin(rid,pw){
 }
 
 function leaveRoom(){
-  if(!confirm('방에서 나가시겠습니까?')) return;
   if(ws&&ws.readyState===1&&currentRoomId){
     ws.send(JSON.stringify({type:'leave_room'}));
   }
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
+  sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   document.getElementById('chatMsgs').innerHTML='';
   document.getElementById('activeNotes').innerHTML='';
@@ -545,6 +596,7 @@ function forceDisconnectToLobby(){
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
+  sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   showScreen('lobby');
 }
@@ -611,19 +663,31 @@ async function toggleMidiInput(){
   if(midiConnected){disconnectMidi();return;}
   try{midiAccess=await navigator.requestMIDIAccess();connectMidi();}catch{toast('MIDI 권한 필요',true);}
 }
+async function autoEnableMidi(){
+  if(midiConnected || midiAutoAttempted || !('requestMIDIAccess' in navigator)) return;
+  midiAutoAttempted=true;
+  try{
+    midiAccess=await navigator.requestMIDIAccess();
+    connectMidi();
+  }catch{}
+}
 function connectMidi(){
+  if(!midiAccess) return;
   for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;
-  midiConnected=true;document.getElementById('btnMidi').className='btn btn-primary';
+  midiAccess.onstatechange=()=>{for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;};
+  midiConnected=true;
   document.getElementById('midiBadge').classList.add('active');toast('MIDI 연결됨');
 }
 function disconnectMidi(){
   if(midiAccess)for(const i of midiAccess.inputs.values())i.onmidimessage=null;
-  midiConnected=false;document.getElementById('btnMidi').className='btn btn-outline';
+  midiConnected=false;
   document.getElementById('midiBadge').classList.remove('active');
 }
 function onMidiMessage(e){
   const[s,n,v]=e.data,cmd=s&0xf0;
-  if(cmd===0x90&&v>0)localNoteOn(n,v);else if(cmd===0x80||(cmd===0x90&&v===0))localNoteOff(n);
+  if(cmd===0x90&&v>0)ensureAudioReady().then(()=>localNoteOn(n,v));
+  else if(cmd===0x80||(cmd===0x90&&v===0))localNoteOff(n,true);
+  else if(cmd===0xB0&&n===64)setSustainPedal(v>=64);
 }
 
 function buildColorPickers(){
