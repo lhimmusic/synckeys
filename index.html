@@ -41,7 +41,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
 .lobby-piano-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:2px 8px 10px;}
-.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;scrollbar-width:thin;scrollbar-color:#252535 #070710;border:1px solid var(--border);border-radius:10px;background:#070710;}
+.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar{height:6px;}
 .lobby-piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v23</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -279,6 +279,7 @@ window.addEventListener('load',()=>{
   buildPopoverSwatches();
   autoEnableMidi();
 });
+window.addEventListener('resize',()=>{buildLobbyKeyboard88();});
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
 document.addEventListener('mousedown', () => {
@@ -408,18 +409,42 @@ function buildKeyboard88(){
   setTimeout(()=>scrollToNote(60),120);
 }
 function buildLobbyKeyboard88(){
-  const src=document.getElementById('keyboard');
   const dst=document.getElementById('lobbyKeyboard');
-  if(!src||!dst) return;
-  dst.innerHTML=src.innerHTML;
-  dst.style.width=src.style.width;
-  dst.style.height=src.style.height;
-  dst.querySelectorAll('.wkey,.bkey').forEach(el=>{
-    const note=parseInt(el.dataset.note,10);
-    if(!Number.isNaN(note)) addKeyEvents(el,note);
-  });
   const sc=document.getElementById('lobbyPianoScroll');
-  if(sc) sc.scrollLeft=Math.max(0,parseInt(src.style.width,10)/2-sc.clientWidth/2);
+  if(!dst||!sc) return;
+  dst.innerHTML='';
+
+  const avail=Math.max(520,sc.clientWidth-26);
+  const L_WKW=Math.max(9,Math.min(16,Math.floor(avail/52)));
+  const L_BKW=Math.round(L_WKW*0.62);
+  const L_WKH=Math.round(L_WKW*5.1);
+  const L_BKH=Math.round(L_WKH*0.62);
+  const lWhiteX={};
+  let wi=0;
+  for(let n=MIDI_MIN;n<=MIDI_MAX;n++){if(!IS_BLACK[n%12]){lWhiteX[n]=wi*L_WKW;wi++;}}
+  const totalW=wi*L_WKW;
+  dst.style.width=totalW+'px';
+  dst.style.height=L_WKH+'px';
+  dst.style.position='relative';
+  dst.style.margin='0 auto';
+
+  for(let n=MIDI_MIN;n<=MIDI_MAX;n++){
+    const deg=n%12;if(IS_BLACK[deg])continue;
+    const oct=Math.floor(n/12)-1;
+    const el=document.createElement('div');el.className='wkey';el.dataset.note=n;
+    el.style.left=lWhiteX[n]+'px';el.style.width=L_WKW+'px';el.style.height=L_WKH+'px';
+    if(deg===0){const lb=document.createElement('div');lb.className='key-label';lb.textContent='C'+oct;el.appendChild(lb);}
+    addKeyEvents(el,n);dst.appendChild(el);
+  }
+  for(let n=MIDI_MIN;n<=MIDI_MAX;n++){
+    const deg=n%12;if(!IS_BLACK[deg])continue;
+    const lx=lWhiteX[n-1];if(lx===undefined)continue;
+    const el=document.createElement('div');el.className='bkey';el.dataset.note=n;
+    el.style.left=(lx+L_WKW-L_BKW/2)+'px';el.style.width=L_BKW+'px';el.style.height=L_BKH+'px';
+    addKeyEvents(el,n);dst.appendChild(el);
+  }
+
+  sc.style.height=(L_WKH+18)+'px';
 }
 function getKeyEl(n,rootId='keyboard'){
   const root=document.getElementById(rootId);
