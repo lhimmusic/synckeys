@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v15</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v16</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -181,12 +181,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     </div>
     <div class="card">
       <div class="card-title">🚪 방 참가</div>
-      <div class="field"><label>방 코드 직접 입력</label>
-        <div style="display:flex;gap:8px">
-          <input type="text" id="joinCode" placeholder="ABC123" maxlength="6" style="flex:1;text-transform:uppercase">
-          <button class="btn btn-outline" onclick="joinByCode()" id="btnJoin" disabled>참가</button>
-        </div>
-      </div>
       <div class="field"><label>내 이름</label><input type="text" id="joinPlayerName" placeholder="Musician" maxlength="20"></div>
       <div class="field"><label>내 색상</label><div class="colors" id="joinColors"></div></div>
       <div class="room-list">
@@ -205,7 +199,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
       <div class="room-id-tag" id="sessRoomId" onclick="copyRoomId()">------</div>
     </div>
     <div class="sess-controls">
-      <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.35" oninput="setVolume(this.value)"></div>
+      <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.2" oninput="setVolume(this.value)"></div>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
   </div>
@@ -254,7 +248,7 @@ const CLOUDTYPE_URL = location.origin.replace(/^http/, 'ws');
 
 // STATE
 let ws=null,myId=null,myColor='#00e5ff',myName='',currentRoomId=null,pendingJoinRoom=null;
-let audioCtx=null,masterGain=null,volume=0.35;
+let audioCtx=null,masterGain=null,volume=0.2;
 let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let pressedLocal=new Set(),pressedRemote=new Map();
@@ -298,13 +292,13 @@ function tryConnect(url){
   ws.onopen=()=>{
     updateBanner('ok','서버 연결됨');
     setConnStatus('ok');
-    ['btnCreate','btnJoin','btnRefresh'].forEach(id=>document.getElementById(id).disabled=false);
+    ['btnCreate','btnRefresh'].forEach(id=>document.getElementById(id).disabled=false);
     refreshRooms(); startPing();
   };
   ws.onclose=()=>{
     updateBanner('err','연결 끊김');
     setConnStatus('err');
-    ['btnCreate','btnJoin','btnRefresh'].forEach(id=>document.getElementById(id).disabled=true);
+    ['btnCreate','btnRefresh'].forEach(id=>document.getElementById(id).disabled=true);
     stopPing();
     if(currentRoomId) forceDisconnectToLobby();
     setTimeout(()=>tryConnect(url),4000);
@@ -340,8 +334,8 @@ function playNote(note,vel=100,remote=false){
   const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();
   const g1=audioCtx.createGain(),g2=audioCtx.createGain();
   o1.type='triangle';o1.frequency.value=f;
-  o2.type='sine';o2.frequency.value=f*2;g2.gain.value=0.18;
-  const v2=(vel/127)*(remote?.5:.65);
+  o2.type='sine';o2.frequency.value=f*2;g2.gain.value=0.12;
+  const v2=(vel/127)*(remote?.38:.5);
   g1.gain.setValueAtTime(v2,audioCtx.currentTime);
   g1.gain.setTargetAtTime(v2*.82,audioCtx.currentTime+.02,.12);
   o1.connect(g1);o2.connect(g2);g1.connect(masterGain);g2.connect(masterGain);
@@ -610,11 +604,6 @@ function createRoom(){
     password:pw,maxPlayers:parseInt(document.getElementById('createMax').value),
     playerName:myName,color:myColor}));
 }
-function joinByCode(){
-  const c=document.getElementById('joinCode').value.trim().toUpperCase();
-  if(!c){toast('코드 입력',true);return;}
-  pendingJoinRoom={id:c,hasPassword:false};attemptJoin(c,'');
-}
 function joinRoom(room){
   pendingJoinRoom=room;
   if(room.hasPassword){document.getElementById('pwModal').classList.add('open');setTimeout(()=>document.getElementById('modalPw').focus(),80);}
@@ -762,7 +751,14 @@ function buildColorPickers(){
     const el=document.getElementById(id);
     COLORS.forEach(c=>{
       const d=document.createElement('div');d.className='cswatch';d.style.background=c;
-      d.onclick=()=>{el.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));d.classList.add('sel');if(i===0)createColorSel=c;else joinColorSel=c;};
+      d.onclick=()=>{
+        el.querySelectorAll('.cswatch').forEach(s=>s.classList.remove('sel'));
+        d.classList.add('sel');
+        if(i===0)createColorSel=c;else joinColorSel=c;
+        // In lobby, preview/play color should follow latest selected color immediately.
+        myColor=c;
+        for(const n of pressedLocal) setKeyVisual(n,true,true,myColor);
+      };
       el.appendChild(d);
     });
   });
