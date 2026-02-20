@@ -237,7 +237,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
 <script>
 // ═══════════════════════════════════════════
-//  CONFIG (주소 자동 연동)
+//  CONFIG (주소 자동 인식)
 // ═══════════════════════════════════════════
 const CLOUDTYPE_URL = location.origin.replace(/^http/, 'ws');
 
@@ -259,10 +259,15 @@ let createColorSel='#00e5ff',joinColorSel='#ff6b35';
 window.addEventListener('load',()=>{
   buildColorPickers();
   buildKeyboard88();
-  initAudio();
   autoConnect();
   buildPopoverSwatches();
 });
+
+// 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
+document.addEventListener('mousedown', () => {
+  if(!audioCtx) initAudio();
+  if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+}, { once: false });
 
 function autoConnect(){
   updateBanner('connecting');
@@ -270,9 +275,9 @@ function autoConnect(){
 }
 function tryConnect(url){
   if(ws){try{ws.close();}catch{}ws=null;}
-  try{ws=new WebSocket(url);}catch{updateBanner('err','잘못된 서버 주소');return;}
+  try{ws=new WebSocket(url);}catch{updateBanner('err','서버 연결 오류');return;}
   ws.onopen=()=>{
-    updateBanner('ok','연결됨');
+    updateBanner('ok','서버 연결됨');
     setConnStatus('ok');
     ['btnCreate','btnJoin','btnRefresh'].forEach(id=>document.getElementById(id).disabled=false);
     refreshRooms(); startPing();
@@ -294,13 +299,15 @@ function updateBanner(state,text){
 }
 
 function initAudio(){
+  if(audioCtx) return;
   audioCtx=new(window.AudioContext||window.webkitAudioContext)();
   masterGain=audioCtx.createGain(); masterGain.gain.value=volume; masterGain.connect(audioCtx.destination);
 }
 function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=volume;}
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
 function playNote(note,vel=100,remote=false){
-  if(!audioCtx)return; if(audioCtx.state==='suspended')audioCtx.resume();
+  if(!audioCtx) initAudio();
+  if(audioCtx.state==='suspended') audioCtx.resume();
   const f=midiToFreq(note);
   const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();
   const g1=audioCtx.createGain(),g2=audioCtx.createGain();
@@ -428,14 +435,6 @@ function updateActiveNotes(){
     t.textContent=NOTE_NAMES[n%12]+(Math.floor(n/12)-1);
     el.appendChild(t);
   });
-  pressedRemote.forEach((list,n)=>{
-    list.forEach(info=>{
-      const t=document.createElement('div');t.className='note-tag';
-      t.style.borderColor=info.color;t.style.color=info.color;
-      t.textContent=NOTE_NAMES[n%12]+(Math.floor(n/12)-1)+' ('+info.name+')';
-      el.appendChild(t);
-    });
-  });
 }
 
 function handleMsg(msg){
@@ -496,12 +495,18 @@ function attemptJoin(rid,pw){
   myColor=joinColorSel;myName=document.getElementById('joinPlayerName').value||'Musician';
   ws.send(JSON.stringify({type:'join_room',roomId:rid,password:pw,playerName:myName,color:myColor}));
 }
+
 function leaveRoom(){
+  if(!confirm('방에서 나가시겠습니까?')) return;
   pressedLocal.forEach(n=>localNoteOff(n));
-  pressedRemote.clear();activeOsc.clear();remoteOsc.clear();updateActiveNotes();
+  activeOsc.forEach((val, key) => killNote(key, activeOsc));
+  remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
-  setConnStatus('');showScreen('lobby');tryConnect(CLOUDTYPE_URL);
+  showScreen('lobby');
+  if(ws) ws.close();
+  setTimeout(autoConnect, 500);
 }
+
 function refreshRooms(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_rooms'}));}
 function renderRoomList(rooms){
   const el=document.getElementById('roomList');el.innerHTML='';
