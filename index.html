@@ -91,7 +91,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .player-chip.mine{cursor:pointer;border-style:dashed;}
 .player-chip.mine:hover{border-color:var(--accent);}
 .player-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.player-ping{font-family:'Space Mono',monospace;font-size:10px;color:#556;}
+.player-ping{font-family:'Space Mono',monospace;font-size:10px;color:var(--green);}
+.room-link{background:none;border:none;padding:0;margin:0;color:inherit;font:inherit;cursor:pointer;text-align:left;}
+.room-link:hover{color:var(--accent);}
 .latency-panel{display:none;gap:16px;padding:6px 20px;background:rgba(8,8,14,.5);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
 .lat-item{display:flex;align-items:center;gap:7px;font-family:'Space Mono',monospace;font-size:10px;}
 .lat-bar{width:56px;height:5px;background:#151525;border-radius:3px;overflow:hidden;}
@@ -142,7 +144,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v10</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v11</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -186,7 +188,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
       <div class="field"><label>내 이름</label><input type="text" id="joinPlayerName" placeholder="Musician" maxlength="20"></div>
       <div class="field"><label>내 색상</label><div class="colors" id="joinColors"></div></div>
       <div class="room-list">
-        <div class="room-list-title">공개 방 목록</div>
+        <div class="room-list-title">전체 방 목록 (공개/비공개)</div>
         <div id="roomList"><div class="no-rooms">서버 연결 대기 중...</div></div>
       </div>
       <button class="btn btn-outline btn-full" onclick="refreshRooms()" id="btnRefresh" disabled style="margin-top:12px">새로고침</button>
@@ -265,7 +267,7 @@ const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
 const IS_BLACK=[false,true,false,true,false,false,true,false,true,false,true,false];
 const WKW=34,BKW=21,BKH=126,WKH=200;
-const COLORS=['#00e5ff','#ff6b35','#00ff88','#a855f7','#ffcc00','#ff4466','#3b82f6','#ec4899','#f97316','#84cc16'];
+const COLORS=['#00e5ff','#ff6b35','#00ff88','#a855f7','#ffcc00','#ff4466','#3b82f6','#ec4899','#84cc16'];
 let createColorSel='#00e5ff',joinColorSel='#ff6b35';
 
 window.addEventListener('load',()=>{
@@ -398,7 +400,7 @@ function setKeyVisual(note,on,isLocal,color){
     if(isLocal){
       if(on){
         el.classList.add('pressed-local');
-        el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)','important');
+        el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+brighten(myColor)+' 100%)','important');
         el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
       }else{
         el.classList.remove('pressed-local');
@@ -406,7 +408,7 @@ function setKeyVisual(note,on,isLocal,color){
         if(r&&r.length){
           const rc=r[r.length-1].color;
           el.classList.add('pressed-remote');
-          el.style.setProperty('background','linear-gradient(180deg,'+rc+' 0%,'+darken(rc)+' 100%)','important');
+          el.style.setProperty('background','linear-gradient(180deg,'+rc+' 0%,'+brighten(rc)+' 100%)','important');
           el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+rc+'99','important');
         }else if(!el.classList.contains('pressed-remote')){
           el.style.removeProperty('background');el.style.removeProperty('box-shadow');
@@ -415,12 +417,12 @@ function setKeyVisual(note,on,isLocal,color){
     } else {
       if(on&&color){
         el.classList.add('pressed-remote');
-        el.style.setProperty('background','linear-gradient(180deg,'+color+' 0%,'+darken(color)+' 100%)','important');
+        el.style.setProperty('background','linear-gradient(180deg,'+color+' 0%,'+brighten(color)+' 100%)','important');
         el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99','important');
       } else {
         el.classList.remove('pressed-remote');
         if(pressedLocal.has(note)){
-          el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)','important');
+          el.style.setProperty('background','linear-gradient(180deg,'+myColor+' 0%,'+brighten(myColor)+' 100%)','important');
           el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
         }else{
           el.style.removeProperty('background');el.style.removeProperty('box-shadow');
@@ -429,9 +431,11 @@ function setKeyVisual(note,on,isLocal,color){
     }
   });
 }
-function darken(hex){
+function brighten(hex){
   const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),b=parseInt(hex.slice(5,7),16);
-  return'rgb('+Math.floor(r*.5)+','+Math.floor(g*.5)+','+Math.floor(b*.5)+')';
+  const mix=0.25;
+  const nr=Math.floor(r+(255-r)*mix),ng=Math.floor(g+(255-g)*mix),nb=Math.floor(b+(255-b)*mix);
+  return'rgb('+nr+','+ng+','+nb+')';
 }
 function addKeyEvents(el,note){
   el.addEventListener('mousedown',e=>{
@@ -641,11 +645,17 @@ function forceDisconnectToLobby(){
 function refreshRooms(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_rooms'}));}
 function renderRoomList(rooms){
   const el=document.getElementById('roomList');el.innerHTML='';
-  if(!rooms.length){el.innerHTML='<div class="no-rooms">공개 방 없음</div>';return;}
+  if(!rooms.length){el.innerHTML='<div class="no-rooms">현재 생성된 방 없음</div>';return;}
   rooms.forEach(r=>{
     const d=document.createElement('div');d.className='room-item';
-    d.innerHTML='<div><div class="room-item-name">'+escHtml(r.name)+'</div><div class="room-item-meta">'+r.id+' · '+r.players+'/'+r.maxPlayers+'명</div></div><div class="room-badges">'+(r.hasPassword?'<span class="badge badge-lock">🔒</span>':'')+'</div>';
-    if(r.players<r.maxPlayers)d.onclick=()=>joinRoom(r);
+    d.innerHTML='<div><div class="room-item-name"><button class="room-link" type="button">'+escHtml(r.name)+'</button></div><div class="room-item-meta">'+r.id+' · '+r.players+'/'+r.maxPlayers+'명</div></div><div class="room-badges">'+(r.hasPassword?'<span class="badge badge-lock">🔒 비공개</span>':'<span class="badge">공개</span>')+'</div>';
+    const link=d.querySelector('.room-link');
+    if(r.players<r.maxPlayers){
+      link.onclick=()=>joinRoom(r);
+      d.onclick=()=>joinRoom(r);
+    }else{
+      link.disabled=true;
+    }
     el.appendChild(d);
   });
 }
