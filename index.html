@@ -78,20 +78,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
 .modal h3{font-family:'Space Mono',monospace;color:var(--accent);margin-bottom:18px;}
 .modal-btns{display:flex;gap:10px;margin-top:16px;}
-.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;}
+.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;}
 .sess-room-name{font-family:'Space Mono',monospace;font-size:15px;color:var(--accent);font-weight:700;}
 .room-id-tag{font-family:'Space Mono',monospace;font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:#556;cursor:pointer;user-select:all;transition:border-color .2s;}
 .room-id-tag:hover{border-color:var(--accent);color:var(--accent);}
 .sess-controls{display:flex;align-items:center;gap:10px;}
 .vol-row{display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:10px;color:#556;}
 .vol-row input[type=range]{width:80px;accent-color:var(--accent);}
-.players-bar{display:flex;gap:8px;padding:8px 20px;background:rgba(8,8,14,.6);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
-.player-chip{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:12px;transition:border-color .2s;}
+.latency-right{font-family:'Space Mono',monospace;font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--border);background:var(--surface2);color:var(--accent);min-width:96px;text-align:center;}
+.players-bar{display:flex;gap:10px;padding:12px 20px;background:rgba(8,8,14,.6);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
+.player-chip{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;background:var(--surface2);border:1px solid var(--border);font-size:15px;transition:border-color .2s;}
 .player-chip.mine{cursor:pointer;border-style:dashed;}
 .player-chip.mine:hover{border-color:var(--accent);}
-.player-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
-.player-ping{font-family:'Space Mono',monospace;font-size:10px;color:#556;}
-.latency-panel{display:flex;gap:16px;padding:6px 20px;background:rgba(8,8,14,.5);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
+.player-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;}
+.player-ping{font-family:'Space Mono',monospace;font-size:12px;color:#7f8aa8;}
+.latency-panel{display:none;}
 .lat-item{display:flex;align-items:center;gap:7px;font-family:'Space Mono',monospace;font-size:10px;}
 .lat-bar{width:56px;height:5px;background:#151525;border-radius:3px;overflow:hidden;}
 .lat-fill{height:100%;border-radius:3px;transition:width .6s,background .6s;}
@@ -102,7 +103,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .scroll-hint{color:#334;font-size:10px;letter-spacing:1px;}
 .oct-btn{width:28px;height:28px;border-radius:6px;background:var(--surface2);border:1px solid var(--border);color:var(--text);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .15s;font-family:'Space Mono',monospace;}
 .oct-btn:hover{border-color:var(--accent);color:var(--accent);}
-.view-label{color:var(--accent);font-size:12px;min-width:50px;text-align:center;}
+.view-label{display:none;}
 .piano-scroll{flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;padding:16px 32px 0;scrollbar-width:thin;scrollbar-color:#252535 #070710;scroll-behavior:smooth;}
 .piano-scroll::-webkit-scrollbar{height:6px;}
 .piano-scroll::-webkit-scrollbar-track{background:#070710;}
@@ -111,14 +112,14 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .keyboard{position:relative;flex-shrink:0;user-select:none;}
 .wkey{height:200px;background:linear-gradient(180deg,#dde0f0 0%,#f0f0ff 60%,#e8e8f8 100%);border:1px solid #9090b0;border-top:3px solid #c0c0d8;border-radius:0 0 6px 6px;cursor:pointer;position:absolute;transition:background .05s;box-shadow:inset 0 -3px 5px rgba(0,0,0,.08),1px 0 3px rgba(0,0,0,.12);}
 .wkey:hover{background:linear-gradient(180deg,#c8eeff 0%,#e0f8ff 100%);}
-.wkey.pressed-local{background:linear-gradient(180deg,var(--accent) 0%,#009bcc 100%)!important;box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 20px rgba(0,229,255,.65)!important;transform:scaleY(.975);transform-origin:top;}
-.wkey.pressed-remote{box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 18px rgba(255,255,255,.35)!important;transform:scaleY(.975);transform-origin:top;}
+.wkey.pressed-local{background:linear-gradient(180deg,var(--accent) 0%,#009bcc 100%)!important;box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 20px rgba(0,229,255,.65)!important;}
+.wkey.pressed-remote{box-shadow:inset 0 3px 10px rgba(0,0,0,.35),0 0 18px rgba(255,255,255,.35)!important;}
 .key-label{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);font-family:'Space Mono',monospace;font-size:7px;color:#9090b8;pointer-events:none;white-space:nowrap;}
 .bkey{height:124px;background:linear-gradient(180deg,#1c1c2e 0%,#2a2a42 80%,#1a1a2e 100%);border:1px solid #404060;border-top:none;border-radius:0 0 4px 4px;position:absolute;top:0;z-index:2;cursor:pointer;box-shadow:2px 5px 10px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.05);transition:background .05s;}
 .bkey:hover{background:linear-gradient(180deg,#2a2a44 0%,#383856 100%);}
 .bkey.pressed-local{background:linear-gradient(180deg,var(--accent) 0%,#007799 100%)!important;box-shadow:inset 0 3px 8px rgba(0,0,0,.4),0 0 16px rgba(0,229,255,.8)!important;}
 .bkey.pressed-remote{box-shadow:inset 0 3px 8px rgba(0,0,0,.4),0 0 14px rgba(255,255,255,.45)!important;}
-.active-notes{padding:6px 20px;display:flex;gap:6px;flex-wrap:wrap;min-height:30px;max-height:50px;overflow:hidden;align-items:center;flex-shrink:0;border-top:1px solid var(--border);background:rgba(8,8,14,.7);}
+.active-notes{display:none;}
 .note-tag{padding:1px 9px;border-radius:20px;font-family:'Space Mono',monospace;font-size:10px;border:1px solid;animation:noteIn .06s ease;}
 @keyframes noteIn{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
 .chat-panel{height:118px;display:flex;flex-direction:column;border-top:1px solid var(--border);background:var(--surface);flex-shrink:0;}
@@ -200,17 +201,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     </div>
     <div class="sess-controls">
       <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.7" oninput="setVolume(this.value)"></div>
-      <button class="btn btn-outline" onclick="toggleMidiInput()" id="btnMidi">🎹 MIDI 연결</button>
+      <div class="latency-right" id="latencyRight">LAT --ms</div>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
   </div>
   <div class="players-bar" id="playersBar"></div>
-  <div class="latency-panel" id="latencyPanel"></div>
+  <div class="latency-panel" id="latencyPanel" aria-hidden="true"></div>
   <div class="sess-main">
     <div class="piano-area">
       <div class="piano-toolbar">
         <button class="oct-btn" onclick="scrollOctave(-1)">◀</button>
-        <span class="view-label" id="viewLabel">C4</span>
         <button class="oct-btn" onclick="scrollOctave(1)">▶</button>
         <span class="scroll-hint">← 스크롤로 전체 88건반 탐색 →</span>
       </div>
@@ -260,6 +260,7 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
+let midiAutoAttempted=false;
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -274,6 +275,7 @@ window.addEventListener('load',()=>{
   buildLobbyKeyboard88();
   autoConnect();
   buildPopoverSwatches();
+  autoEnableMidi();
 });
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
@@ -417,7 +419,8 @@ function updateViewLabel(){
   for(const [n,x] of Object.entries(whiteX)){
     const d=Math.abs(x-cx);if(d<bestDist){bestDist=d;best=parseInt(n);}
   }
-  document.getElementById('viewLabel').textContent=NOTE_NAMES[best%12]+(Math.floor(best/12)-1);
+  const label=document.getElementById('viewLabel');
+  if(label) label.textContent=NOTE_NAMES[best%12]+(Math.floor(best/12)-1);
 }
 document.getElementById('pianoScroll').addEventListener('scroll',updateViewLabel);
 
@@ -469,6 +472,7 @@ function handleMsg(msg){
       document.getElementById('sessRoomId').textContent=msg.roomId;
       document.getElementById('sessRoomName').textContent=msg.roomInfo.name;
       updatePlayers(msg.roomInfo.players);showScreen('session');scrollToNote(60);
+      autoEnableMidi();
       toast('방 입장 완료');break;
     case 'player_joined':
       updatePlayers(msg.roomInfo.players);
@@ -501,7 +505,7 @@ function handleMsg(msg){
 
 function createRoom(){
   if(!ws||ws.readyState!==1){toast('서버 연결 필요',true);return;}
-  myColor=createColorSel;myName=document.getElementById('createPlayerName').value||'Host';
+  myColor=createColorSel;myName=document.getElementById('createPlayerName').value||'Musician';
   ws.send(JSON.stringify({type:'create_room',name:document.getElementById('createName').value||'Room',
     password:document.getElementById('createPw').value,maxPlayers:parseInt(document.getElementById('createMax').value),
     playerName:myName,color:myColor}));
@@ -525,7 +529,6 @@ function attemptJoin(rid,pw){
 }
 
 function leaveRoom(){
-  if(!confirm('방에서 나가시겠습니까?')) return;
   if(ws&&ws.readyState===1&&currentRoomId){
     ws.send(JSON.stringify({type:'leave_room'}));
   }
@@ -571,6 +574,11 @@ function renderPlayers(){
   }
 }
 function renderLatency(){
+  const right=document.getElementById('latencyRight');
+  if(right){
+    const myMs=myId?(latencyMap.get(myId)||0):0;
+    right.textContent='LAT '+myMs+'ms';
+  }
   const el=document.getElementById('latencyPanel');el.innerHTML='';
   for(const[id,p]of playerMap){
     const ms=latencyMap.get(id)||0,pct=Math.min(100,ms/3),col=ms<60?'var(--green)':ms<150?'#ffcc00':'var(--danger)';
@@ -609,14 +617,24 @@ async function toggleMidiInput(){
   if(midiConnected){disconnectMidi();return;}
   try{midiAccess=await navigator.requestMIDIAccess();connectMidi();}catch{toast('MIDI 권한 필요',true);}
 }
+async function autoEnableMidi(){
+  if(midiConnected || midiAutoAttempted || !('requestMIDIAccess' in navigator)) return;
+  midiAutoAttempted=true;
+  try{
+    midiAccess=await navigator.requestMIDIAccess();
+    connectMidi();
+  }catch{}
+}
 function connectMidi(){
+  if(!midiAccess) return;
   for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;
-  midiConnected=true;document.getElementById('btnMidi').className='btn btn-primary';
+  midiAccess.onstatechange=()=>{for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;};
+  midiConnected=true;
   document.getElementById('midiBadge').classList.add('active');toast('MIDI 연결됨');
 }
 function disconnectMidi(){
   if(midiAccess)for(const i of midiAccess.inputs.values())i.onmidimessage=null;
-  midiConnected=false;document.getElementById('btnMidi').className='btn btn-outline';
+  midiConnected=false;
   document.getElementById('midiBadge').classList.remove('active');
 }
 function onMidiMessage(e){
