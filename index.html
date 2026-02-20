@@ -595,14 +595,9 @@ function remoteNoteOff(note,sid){
 }
 function remoteNoteVisualOff(note,sid){
   if(!pressedRemote.has(note)) return;
-  const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
-  if(list.length===0){
-    pressedRemote.delete(note);
-    if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
-  }else{
-    pressedRemote.set(note,list);
-    setKeyVisual(note,true,false,list[list.length-1].color);
-  }
+  // Visual-only off while sustain is held. Keep remote pressed state
+  // so subsequent noteOff handling and voice cleanup stay consistent.
+  if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
