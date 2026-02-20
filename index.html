@@ -561,6 +561,7 @@ function localNoteOff(note,fromPhysical=true){
   if(sustainPedalDown && fromPhysical){
     if(pressedLocal.has(note)) sustainedNotes.add(note);
     setKeyVisual(note,false,true,null);
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteVisualOff',note}}));
     return;
   }
   stopLocalNoteNow(note);
@@ -591,6 +592,17 @@ function remoteNoteOff(note,sid){
     else{pressedRemote.set(note,list);setKeyVisual(note,true,false,list[list.length-1].color);}
   }
   updateActiveNotes();
+}
+function remoteNoteVisualOff(note,sid){
+  if(!pressedRemote.has(note)) return;
+  const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
+  if(list.length===0){
+    pressedRemote.delete(note);
+    if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
+  }else{
+    pressedRemote.set(note,list);
+    setKeyVisual(note,true,false,list[list.length-1].color);
+  }
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
@@ -623,6 +635,7 @@ function handleMsg(msg){
         remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,c,msg.data.velocity);
       }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
+      else if(msg.data.type==='noteVisualOff')remoteNoteVisualOff(msg.data.note,msg.senderId);
       else if(msg.data.type==='controlChange' && msg.data.controller===64){
         sendMidiToDaw(0xB0,64,msg.data.value||0);
       }
