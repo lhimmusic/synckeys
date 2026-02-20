@@ -92,7 +92,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .player-chip.mine:hover{border-color:var(--accent);}
 .player-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
 .player-ping{font-family:'Space Mono',monospace;font-size:10px;color:#556;}
-.latency-panel{display:flex;gap:16px;padding:6px 20px;background:rgba(8,8,14,.5);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
+.latency-panel{display:none;gap:16px;padding:6px 20px;background:rgba(8,8,14,.5);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;flex-shrink:0;}
 .lat-item{display:flex;align-items:center;gap:7px;font-family:'Space Mono',monospace;font-size:10px;}
 .lat-bar{width:56px;height:5px;background:#151525;border-radius:3px;overflow:hidden;}
 .lat-fill{height:100%;border-radius:3px;transition:width .6s,background .6s;}
@@ -141,7 +141,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v4</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v5</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -280,6 +280,7 @@ window.addEventListener('load',()=>{
 document.addEventListener('mousedown', () => {
   if(!audioCtx) initAudio();
   if(audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  autoEnableMidi();
 }, { once: false });
 
 function autoConnect(){
@@ -398,7 +399,15 @@ function setKeyVisual(note,on,isLocal,color){
         el.style.background='linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)';
       }else{
         el.classList.remove('pressed-local');
-        el.style.background='';
+        const r=pressedRemote.get(note);
+        if(r&&r.length){
+          const rc=r[r.length-1].color;
+          el.classList.add('pressed-remote');
+          el.style.background='linear-gradient(180deg,'+rc+' 0%,'+darken(rc)+' 100%)';
+          el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+rc+'99';
+        }else if(!el.classList.contains('pressed-remote')){
+          el.style.background='';el.style.boxShadow='';
+        }
       }
     } else {
       if(on&&color){
@@ -407,7 +416,11 @@ function setKeyVisual(note,on,isLocal,color){
         el.style.boxShadow='inset 0 3px 10px rgba(0,0,0,.35),0 0 18px '+color+'99';
       } else {
         el.classList.remove('pressed-remote');
-        el.style.background='';el.style.boxShadow='';
+        if(pressedLocal.has(note)){
+          el.style.background='linear-gradient(180deg,'+myColor+' 0%,'+darken(myColor)+' 100%)';
+        }else{
+          el.style.background='';el.style.boxShadow='';
+        }
       }
     }
   });
@@ -678,7 +691,9 @@ async function autoEnableMidi(){
   try{
     midiAccess=await navigator.requestMIDIAccess();
     connectMidi();
-  }catch{}
+  }catch{
+    midiAutoAttempted=false;
+  }
 }
 function connectMidi(){
   if(!midiAccess) return;
@@ -727,7 +742,11 @@ document.addEventListener('keydown',e=>{
 });
 document.addEventListener('keyup',e=>{const n=KB_NOTES[e.key.toLowerCase()];if(n)localNoteOff(n);});
 
-function showScreen(n){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(n).classList.add('active');}
+function showScreen(n){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(n).classList.add('active');
+  window.scrollTo(0,0);
+}
 function setConnStatus(s){
   document.getElementById('connDot').className='dot '+(s==='ok'?'ok':s==='err'?'err':'');
   document.getElementById('connLabel').textContent=s==='ok'?'연결됨':s==='err'?'연결 끊김':'연결 중...';
