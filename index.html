@@ -34,6 +34,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .hero h1 .k{color:var(--accent);text-shadow:0 0 60px rgba(0,229,255,.35);}
 .hero h1 .s{color:var(--accent2);text-shadow:0 0 60px rgba(255,107,53,.28);}
 .hero p{color:#556088;font-size:14px;font-weight:300;}
+.audio-greeting{display:inline-flex;align-items:center;gap:8px;margin-top:12px;padding:10px 16px;border:1px solid var(--accent);border-radius:999px;background:rgba(0,229,255,.08);color:var(--accent);font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;transition:all .2s;}
+.audio-greeting:hover{background:rgba(0,229,255,.14);box-shadow:0 0 18px rgba(0,229,255,.22);}
 .server-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 20px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#556;transition:all .3s;}
 .server-banner.ok{border-color:var(--green);color:var(--green);}
 .server-banner.err{border-color:var(--danger);color:var(--danger);}
@@ -146,7 +148,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v23</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -157,6 +159,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
   <div class="hero">
     <h1><span class="k">SYNC</span><span class="s">KEYS</span></h1>
     <p>어디서든 함께 연주하세요</p>
+    <button class="audio-greeting" id="audioGreeting" onclick="unlockAudioFromGreeting()">안녕하세요! 소리 시작하려면 클릭</button>
   </div>
   <div class="server-banner" id="serverBanner">
     <div class="dot" id="bannerDot"></div><span id="bannerText">서버에 자동 연결 중...</span>
@@ -263,6 +266,7 @@ let sustainPedalDown=false;
 let heldLocalNotes=new Set();
 let sustainedNotes=new Set();
 let pendingNoteOns=new Map();
+let audioGreetingDismissed=false;
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -278,6 +282,7 @@ window.addEventListener('load',()=>{
   autoConnect();
   buildPopoverSwatches();
   autoEnableMidi();
+  updateAudioGreeting();
 });
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
@@ -327,7 +332,20 @@ async function ensureAudioReady(){
   if(audioCtx && audioCtx.state==='suspended'){
     try{await audioCtx.resume();}catch{}
   }
+  updateAudioGreeting();
   flushPendingNoteOns();
+}
+function updateAudioGreeting(){
+  const el=document.getElementById('audioGreeting');
+  if(!el) return;
+  const unlocked=!!(audioCtx && audioCtx.state==='running');
+  el.style.display=(audioGreetingDismissed||unlocked)?'none':'inline-flex';
+}
+async function unlockAudioFromGreeting(){
+  audioGreetingDismissed=true;
+  await ensureAudioReady();
+  autoEnableMidi();
+  updateAudioGreeting();
 }
 function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=volume;}
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
