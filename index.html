@@ -41,7 +41,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
 .lobby-piano-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:2px 8px 10px;}
-.lobby-piano-scroll{height:250px;padding:10px 12px 0;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;scrollbar-width:thin;scrollbar-color:#252535 #070710;border:1px solid var(--border);border-radius:10px;background:#070710;}
+.lobby-piano-scroll{height:250px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar{height:6px;}
 .lobby-piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v25</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v26</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -415,14 +415,19 @@ function buildLobbyKeyboard88(){
   dst.innerHTML=src.innerHTML;
   dst.style.width=src.style.width;
   dst.style.height=src.style.height;
+  dst.style.transformOrigin='top center';
+  dst.style.margin='0 auto';
   dst.querySelectorAll('.wkey,.bkey').forEach(el=>{
     const note=parseInt(el.dataset.note,10);
     if(!Number.isNaN(note)) addKeyEvents(el,note);
   });
   const sc=document.getElementById('lobbyPianoScroll');
   if(sc){
-    sc.style.height=(WKH+18)+'px';
-    sc.scrollLeft=Math.max(0,parseInt(src.style.width,10)/2-sc.clientWidth/2);
+    const fullW=parseInt(src.style.width,10)||1768;
+    const avail=Math.max(300,sc.clientWidth-24);
+    const scale=Math.min(1,avail/fullW);
+    dst.style.transform='scale('+scale+')';
+    sc.style.height=(Math.round(WKH*scale)+18)+'px';
   }
 }
 function getKeyEl(n,rootId='keyboard'){
