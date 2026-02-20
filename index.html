@@ -541,7 +541,17 @@ function localNoteOn(note,vel){
     return;
   }
   pendingNoteOns.delete(note);
-  if(pressedLocal.has(note))return;
+  if(pressedLocal.has(note)){
+    // While sustain is down, same-note retrigger should still light and sound again.
+    sustainedNotes.delete(note);
+    setKeyVisual(note,true,true,myColor);
+    killNote(note,activeOsc);
+    const retrigger=playNote(note,vel,false);
+    if(retrigger)activeOsc.set(note,retrigger);
+    updateActiveNotes();
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOn',note,velocity:vel}}));
+    return;
+  }
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
   const n=playNote(note,vel,false);if(n)activeOsc.set(note,n);
   sustainedNotes.delete(note);
