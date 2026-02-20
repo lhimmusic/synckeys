@@ -149,7 +149,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v25</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v26</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -394,15 +394,15 @@ function sendMidiToDaw(status,data1,data2=0){
 function getRemoteDawChannel(sid){
   if(remoteDawChannel.has(sid)) return remoteDawChannel.get(sid);
   const used=new Set(remoteDawChannel.values());
-  // Reserve channel 1 for local performer, use channel 2+ for remote players.
-  for(let ch=2;ch<=15;ch++){
+  // DAW compatibility first: allocate from channel 1 so default tracks can receive remote MIDI.
+  for(let ch=1;ch<=15;ch++){
     if(!used.has(ch)){
       remoteDawChannel.set(sid,ch);
       return ch;
     }
   }
-  remoteDawChannel.set(sid,2);
-  return 2;
+  remoteDawChannel.set(sid,1);
+  return 1;
 }
 function dawStatus(baseStatus,channel){
   return (baseStatus&0xf0)|(channel&0x0f);
