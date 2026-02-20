@@ -28,7 +28,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .screen.active{display:block;}
 #session{display:none;flex-direction:column;}
 #session.active{display:flex;flex:1;min-height:0;}
-#lobby{max-width:1220px;margin:0 auto;padding:40px 20px;}
+#lobby{max-width:860px;margin:0 auto;padding:48px 20px;}
 .hero{text-align:center;margin-bottom:40px;}
 .hero h1{font-family:'Space Mono',monospace;font-size:clamp(28px,6vw,56px);line-height:1.1;margin-bottom:14px;letter-spacing:2px;}
 .hero h1 .k{color:var(--accent);text-shadow:0 0 60px rgba(0,229,255,.35);}
@@ -41,7 +41,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
 .lobby-piano-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:2px 8px 10px;}
-.lobby-piano-scroll{height:250px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
+.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar{height:6px;}
 .lobby-piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v26</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -279,7 +279,6 @@ window.addEventListener('load',()=>{
   buildPopoverSwatches();
   autoEnableMidi();
 });
-window.addEventListener('resize',()=>{buildLobbyKeyboard88();});
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
 document.addEventListener('mousedown', () => {
@@ -424,7 +423,7 @@ function buildLobbyKeyboard88(){
   const sc=document.getElementById('lobbyPianoScroll');
   if(sc){
     const fullW=parseInt(src.style.width,10)||1768;
-    const avail=Math.max(300,sc.clientWidth-24);
+    const avail=Math.max(320,sc.clientWidth-24);
     const scale=Math.min(1,avail/fullW);
     dst.style.transform='scale('+scale+')';
     sc.style.height=(Math.round(WKH*scale)+18)+'px';
@@ -562,7 +561,6 @@ function localNoteOff(note,fromPhysical=true){
   if(sustainPedalDown && fromPhysical){
     if(pressedLocal.has(note)) sustainedNotes.add(note);
     setKeyVisual(note,false,true,null);
-    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteVisualOff',note}}));
     return;
   }
   stopLocalNoteNow(note);
@@ -593,17 +591,6 @@ function remoteNoteOff(note,sid){
     else{pressedRemote.set(note,list);setKeyVisual(note,true,false,list[list.length-1].color);}
   }
   updateActiveNotes();
-}
-function remoteNoteVisualOff(note,sid){
-  if(!pressedRemote.has(note)) return;
-  const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
-  if(list.length===0){
-    pressedRemote.delete(note);
-    if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
-  }else{
-    pressedRemote.set(note,list);
-    setKeyVisual(note,true,false,list[list.length-1].color);
-  }
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
@@ -636,7 +623,6 @@ function handleMsg(msg){
         remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,c,msg.data.velocity);
       }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
-      else if(msg.data.type==='noteVisualOff')remoteNoteVisualOff(msg.data.note,msg.senderId);
       else if(msg.data.type==='controlChange' && msg.data.controller===64){
         sendMidiToDaw(0xB0,64,msg.data.value||0);
       }
