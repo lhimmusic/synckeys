@@ -42,6 +42,7 @@ const server = http.createServer((req, res) => {
 
 const wss = new WebSocket.Server({ server });
 const rooms = new Map();
+const isFourDigitPassword = (v) => /^\d{4}$/.test(v);
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 function broadcast(room, message, excludeWs = null) {
@@ -63,6 +64,32 @@ function safeColor(value, fallback = '#00e5ff') {
   return typeof value === 'string' && HEX_COLOR_RE.test(value) ? value : fallback;
 }
 
+function buildRoomList() {
+  const list = [];
+  for (const [id, room] of rooms) {
+    list.push({
+      id,
+      name: room.name,
+      players: room.clients.size,
+      maxPlayers: room.maxPlayers,
+      hasPassword: !!room.password
+    });
+  }
+  return list;
+}
+
+function sendRoomListTo(ws) {
+  if (ws.readyState !== WebSocket.OPEN) return;
+  ws.send(JSON.stringify({ type: 'room_list', rooms: buildRoomList() }));
+}
+
+function pushRoomListToAll() {
+  const payload = JSON.stringify({ type: 'room_list', rooms: buildRoomList() });
+  for (const client of wss.clients) {
+    if (client.readyState === WebSocket.OPEN) client.send(payload);
+  }
+}
+
 wss.on('connection', (ws) => {
   let currentRoom = null;
   const clientId = crypto.randomUUID();
@@ -80,6 +107,7 @@ wss.on('connection', (ws) => {
     }
     currentRoom = null;
     if (sendAck && ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'left_room' }));
+    pushRoomListToAll();
   }
 
   ws.on('message', (raw) => {
@@ -88,20 +116,28 @@ wss.on('connection', (ws) => {
 
     switch (msg.type) {
       case 'create_room': {
+        const rawPw = String(msg.password || '').trim();
+        if (rawPw && !isFourDigitPassword(rawPw)) {
+          ws.send(JSON.stringify({ type: 'error', message: '비밀번호는 숫자 4자리만 가능합니다.' }));
+          return;
+        }
         const roomId = crypto.randomBytes(3).toString('hex').toUpperCase();
-        const room = { name: (msg.name || 'New Room').slice(0, 40), password: msg.password || '', clients: new Map(), maxPlayers: Math.min(msg.maxPlayers || 8, 16) };
+        const room = { name: (msg.name || 'New Room').slice(0, 40), password: rawPw, clients: new Map(), maxPlayers: Math.min(msg.maxPlayers || 8, 16) };
         rooms.set(roomId, room);
         currentRoom = roomId;
         clientInfo.name = (msg.playerName || 'Host').slice(0, 20);
         clientInfo.color = safeColor(msg.color, '#00e5ff');
         room.clients.set(ws, clientInfo);
         ws.send(JSON.stringify({ type: 'room_joined', roomId, clientId, roomInfo: getRoomInfo(room) }));
+        pushRoomListToAll();
         break;
       }
       case 'join_room': {
         const room = rooms.get(msg.roomId);
         if (!room) { ws.send(JSON.stringify({ type: 'error', message: '방을 찾을 수 없습니다.' })); return; }
-        if (room.password && room.password !== msg.password) { ws.send(JSON.stringify({ type: 'error', message: '비밀번호가 틀렸습니다.' })); return; }
+        const joinPw = String(msg.password || '').trim();
+        if (room.password && !isFourDigitPassword(joinPw)) { ws.send(JSON.stringify({ type: 'error', message: '비밀번호는 숫자 4자리만 가능합니다.' })); return; }
+        if (room.password && room.password !== joinPw) { ws.send(JSON.stringify({ type: 'error', message: '비밀번호가 틀렸습니다.' })); return; }
         if (room.clients.size >= room.maxPlayers) { ws.send(JSON.stringify({ type: 'error', message: '방이 가득 찼습니다.' })); return; }
         currentRoom = msg.roomId;
         clientInfo.name = (msg.playerName || 'Musician').slice(0, 20);
@@ -109,6 +145,7 @@ wss.on('connection', (ws) => {
         room.clients.set(ws, clientInfo);
         ws.send(JSON.stringify({ type: 'room_joined', roomId: msg.roomId, clientId, roomInfo: getRoomInfo(room) }));
         broadcast(room, { type: 'player_joined', player: clientInfo, roomInfo: getRoomInfo(room) }, ws);
+        pushRoomListToAll();
         break;
       }
       case 'midi': {
@@ -122,9 +159,7 @@ wss.on('connection', (ws) => {
         break;
       }
       case 'get_rooms': {
-        const list = [];
-        for (const [id, room] of rooms) list.push({ id, name: room.name, players: room.clients.size, maxPlayers: room.maxPlayers, hasPassword: !!room.password });
-        ws.send(JSON.stringify({ type: 'room_list', rooms: list }));
+        sendRoomListTo(ws);
         break;
       }
       case 'chat': {
@@ -163,6 +198,8 @@ wss.on('connection', (ws) => {
   ws.on('close', () => {
     leaveCurrentRoom(false);
   });
+
+  sendRoomListTo(ws);
 });
 
 server.listen(PORT, () => console.log(`🎹 Server running on port ${PORT}`));
