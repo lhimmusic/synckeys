@@ -37,6 +37,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .server-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 20px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#556;transition:all .3s;}
 .server-banner.ok{border-color:var(--green);color:var(--green);}
 .server-banner.err{border-color:var(--danger);color:var(--danger);}
+.midi-permission-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin:14px auto 0;max-width:860px;background:rgba(255,107,53,.10);border:1px solid rgba(255,107,53,.55);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#ffb18f;}
+.midi-permission-banner .mini-btn{border:1px solid #ff6b35;background:#ff6b35;color:#13131c;border-radius:8px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;}
+.midi-permission-banner .mini-btn:hover{background:#ff814f;border-color:#ff814f;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
@@ -152,6 +155,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
   </div>
 </header>
+<div class="midi-permission-banner" id="midiPermissionBanner">
+  <span id="midiPermissionText">MIDI 권한이 필요합니다. 주소창 권한에서 허용해 주세요.</span>
+  <button class="mini-btn" type="button" onclick="retryMidiPermission()">MIDI 허용 다시 요청</button>
+</div>
 
 <div class="screen active" id="lobby">
   <div class="hero">
@@ -258,10 +265,12 @@ let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let roomListAutoTimer=null;
 let midiAutoAttempted=false;
+let midiPermissionBlocked=false;
 let mouseDragActive=false,dragCurrentNote=null;
 let sustainPedalDown=false;
 let heldLocalNotes=new Set();
 let sustainedNotes=new Set();
+let sustainedSentNoteOff=new Set();
 let pendingNoteOns=new Map();
 
 const MIDI_MIN=21,MIDI_MAX=108;
@@ -275,6 +284,7 @@ window.addEventListener('load',()=>{
   buildColorPickers();
   buildKeyboard88();
   buildLobbyKeyboard88();
+  refreshMidiPermissionBanner();
   autoConnect();
   buildPopoverSwatches();
   autoEnableMidi();
@@ -315,6 +325,27 @@ function updateBanner(state,text){
   b.className='server-banner '+state;
   d.className='dot '+(state==='ok'?'ok':state==='err'?'err':'');
   t.textContent=text||(state==='connecting'?'서버 자동 연결 중...':'');
+}
+function refreshMidiPermissionBanner(message=''){
+  const box=document.getElementById('midiPermissionBanner');
+  const txt=document.getElementById('midiPermissionText');
+  if(!box||!txt) return;
+  if(midiConnected){
+    box.style.display='none';
+    return;
+  }
+  if(!('requestMIDIAccess' in navigator)){
+    txt.textContent='이 브라우저는 Web MIDI를 지원하지 않습니다. Chrome/Edge 권장.';
+    box.style.display='flex';
+    return;
+  }
+  if(midiPermissionBlocked){
+    txt.textContent=message||'MIDI 권한이 차단되어 있습니다. 주소창 권한에서 허용으로 바꿔 주세요.';
+    box.style.display='flex';
+    return;
+  }
+  txt.textContent=message||'MIDI 권한이 필요합니다. "MIDI 허용 다시 요청"을 눌러 주세요.';
+  box.style.display='flex';
 }
 
 function initAudio(){
@@ -544,6 +575,7 @@ function localNoteOn(note,vel){
   if(pressedLocal.has(note)){
     // While sustain is down, same-note retrigger should still light and sound again.
     sustainedNotes.delete(note);
+    sustainedSentNoteOff.delete(note);
     setKeyVisual(note,true,true,myColor);
     killNote(note,activeOsc);
     const retrigger=playNote(note,vel,false);
@@ -555,6 +587,7 @@ function localNoteOn(note,vel){
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
   const n=playNote(note,vel,false);if(n)activeOsc.set(note,n);
   sustainedNotes.delete(note);
+  sustainedSentNoteOff.delete(note);
   updateActiveNotes();
   if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOn',note,velocity:vel}}));
 }
@@ -563,7 +596,11 @@ function stopLocalNoteNow(note){
   pressedLocal.delete(note);setKeyVisual(note,false,true,null);
   killNote(note,activeOsc);updateActiveNotes();
   sustainedNotes.delete(note);
-  if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
+  if(sustainedSentNoteOff.has(note)){
+    sustainedSentNoteOff.delete(note);
+  }else if(ws&&ws.readyState===1){
+    ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
+  }
 }
 function localNoteOff(note,fromPhysical=true){
   if(fromPhysical) heldLocalNotes.delete(note);
@@ -571,7 +608,10 @@ function localNoteOff(note,fromPhysical=true){
   if(sustainPedalDown && fromPhysical){
     if(pressedLocal.has(note)) sustainedNotes.add(note);
     setKeyVisual(note,false,true,null);
-    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteVisualOff',note}}));
+    if(ws&&ws.readyState===1){
+      ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
+      sustainedSentNoteOff.add(note);
+    }
     return;
   }
   stopLocalNoteNow(note);
@@ -641,9 +681,6 @@ function handleMsg(msg){
       }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
       else if(msg.data.type==='noteVisualOff')remoteNoteVisualOff(msg.data.note,msg.senderId);
-      else if(msg.data.type==='controlChange' && msg.data.controller===64){
-        sendMidiToDaw(0xB0,64,msg.data.value||0);
-      }
       break;
     case 'color_changed':
       if(playerMap.has(msg.playerId)){playerMap.get(msg.playerId).color=msg.color;renderPlayers();renderLatency();}
@@ -695,6 +732,7 @@ function leaveRoom(){
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
+  sustainedSentNoteOff.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   document.getElementById('chatMsgs').innerHTML='';
@@ -710,6 +748,7 @@ function resetAllNotes(){
   pressedRemote.clear();
   heldLocalNotes.clear();
   sustainedNotes.clear();
+  sustainedSentNoteOff.clear();
   pendingNoteOns.clear();
   sustainPedalDown=false;
   for(let n=MIDI_MIN;n<=MIDI_MAX;n++){
@@ -725,6 +764,7 @@ function forceDisconnectToLobby(){
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
+  sustainedSentNoteOff.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   showScreen('lobby');
@@ -811,14 +851,26 @@ async function toggleMidiInput(){
   try{midiAccess=await navigator.requestMIDIAccess();connectMidi();}catch{toast('MIDI 권한 필요',true);}
 }
 async function autoEnableMidi(){
-  if(midiConnected || midiAutoAttempted || !('requestMIDIAccess' in navigator)) return;
+  if(!('requestMIDIAccess' in navigator)){
+    refreshMidiPermissionBanner();
+    return;
+  }
+  if(midiConnected || midiAutoAttempted) return;
   midiAutoAttempted=true;
   try{
     midiAccess=await navigator.requestMIDIAccess();
+    midiPermissionBlocked=false;
     connectMidi();
   }catch{
-    midiAutoAttempted=false;
+    midiPermissionBlocked=true;
+    refreshMidiPermissionBanner();
   }
+}
+async function retryMidiPermission(){
+  midiAutoAttempted=false;
+  midiPermissionBlocked=false;
+  refreshMidiPermissionBanner('MIDI 권한 요청 중...');
+  await autoEnableMidi();
 }
 function connectMidi(){
   if(!midiAccess) return;
@@ -830,12 +882,14 @@ function connectMidi(){
   };
   midiConnected=true;
   document.getElementById('midiBadge').classList.add('active');toast('MIDI 연결됨');
+  refreshMidiPermissionBanner();
 }
 function disconnectMidi(){
   if(midiAccess)for(const i of midiAccess.inputs.values())i.onmidimessage=null;
   midiOutputs=[];
   midiConnected=false;
   document.getElementById('midiBadge').classList.remove('active');
+  refreshMidiPermissionBanner();
 }
 function onMidiMessage(e){
   const[s,n,v]=e.data,cmd=s&0xf0;
@@ -844,7 +898,6 @@ function onMidiMessage(e){
   else if(cmd===0x80||(cmd===0x90&&v===0))localNoteOff(n,true);
   else if(cmd===0xB0&&n===64){
     setSustainPedal(v>=64);
-    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'controlChange',controller:64,value:v}}));
   }
 }
 
