@@ -254,7 +254,7 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let midiOutputs=[];
 const recentOutboundMidi=new Map();
-let pressedLocal=new Set(),pressedRemote=new Map();
+let pressedLocal=new Set(),pressedRemote=new Map(),pressedRemoteVisual=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let roomListAutoTimer=null;
 let midiAutoAttempted=false;
@@ -444,7 +444,7 @@ function setKeyVisual(note,on,isLocal,color){
         el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
       }else{
         el.classList.remove('pressed-local');
-        const r=pressedRemote.get(note);
+        const r=pressedRemoteVisual.get(note);
         if(r&&r.length){
           const rc=r[r.length-1].color;
           el.classList.add('pressed-remote');
@@ -575,9 +575,12 @@ function setSustainPedal(isDown){
 }
 function remoteNoteOn(note,sid,sname,scolor,vel){
   if(!pressedRemote.has(note))pressedRemote.set(note,[]);
+  if(!pressedRemoteVisual.has(note))pressedRemoteVisual.set(note,[]);
   const list=pressedRemote.get(note);
+  const vlist=pressedRemoteVisual.get(note);
   if(!list.find(x=>x.sid===sid))list.push({sid,color:scolor,name:sname});
-  setKeyVisual(note,true,false,scolor);
+  if(!vlist.find(x=>x.sid===sid))vlist.push({sid,color:scolor,name:sname});
+  setKeyVisual(note,true,false,vlist[vlist.length-1].color);
   sendMidiToDaw(0x90,note,vel||100);
   const key=sid+'_'+note;
   if(!remoteOsc.has(key)){const n=playNote(note,vel,true);if(n)remoteOsc.set(key,n);}
@@ -588,16 +591,26 @@ function remoteNoteOff(note,sid){
   killNote(sid+'_'+note,remoteOsc);
   if(pressedRemote.has(note)){
     const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
-    if(list.length===0){pressedRemote.delete(note);setKeyVisual(note,false,false,null);}
-    else{pressedRemote.set(note,list);setKeyVisual(note,true,false,list[list.length-1].color);}
+    if(list.length===0) pressedRemote.delete(note);
+    else pressedRemote.set(note,list);
+  }
+  if(pressedRemoteVisual.has(note)){
+    const vlist=pressedRemoteVisual.get(note).filter(x=>x.sid!==sid);
+    if(vlist.length===0){pressedRemoteVisual.delete(note);setKeyVisual(note,false,false,null);}
+    else{pressedRemoteVisual.set(note,vlist);setKeyVisual(note,true,false,vlist[vlist.length-1].color);}
   }
   updateActiveNotes();
 }
 function remoteNoteVisualOff(note,sid){
-  if(!pressedRemote.has(note)) return;
-  // Visual-only off while sustain is held. Keep remote pressed state
-  // so subsequent noteOff handling and voice cleanup stay consistent.
-  if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
+  if(!pressedRemoteVisual.has(note)) return;
+  const vlist=pressedRemoteVisual.get(note).filter(x=>x.sid!==sid);
+  if(vlist.length===0){
+    pressedRemoteVisual.delete(note);
+    if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
+  }else{
+    pressedRemoteVisual.set(note,vlist);
+    setKeyVisual(note,true,false,vlist[vlist.length-1].color);
+  }
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
@@ -684,6 +697,7 @@ function leaveRoom(){
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
+  pressedRemote.clear();pressedRemoteVisual.clear();
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
@@ -698,6 +712,7 @@ function resetAllNotes(){
   for(const [key] of Array.from(remoteOsc)) killNote(key,remoteOsc);
   pressedLocal.clear();
   pressedRemote.clear();
+  pressedRemoteVisual.clear();
   heldLocalNotes.clear();
   sustainedNotes.clear();
   pendingNoteOns.clear();
@@ -714,6 +729,7 @@ function forceDisconnectToLobby(){
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
+  pressedRemote.clear();pressedRemoteVisual.clear();
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
