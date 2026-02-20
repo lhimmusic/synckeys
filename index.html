@@ -37,14 +37,11 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .server-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 20px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#556;transition:all .3s;}
 .server-banner.ok{border-color:var(--green);color:var(--green);}
 .server-banner.err{border-color:var(--danger);color:var(--danger);}
-.midi-permission-banner{display:none;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;padding:10px 14px;margin:14px auto 0;max-width:860px;background:rgba(255,107,53,.10);border:1px solid rgba(255,107,53,.55);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#ffb18f;}
-.midi-permission-banner .mini-btn{border:1px solid #ff6b35;background:#ff6b35;color:#13131c;border-radius:8px;padding:6px 10px;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;letter-spacing:.4px;cursor:pointer;}
-.midi-permission-banner .mini-btn:hover{background:#ff814f;border-color:#ff814f;}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
 .lobby-piano-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:2px 8px 10px;}
-.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
+.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow-x:auto;overflow-y:hidden;display:flex;align-items:flex-end;scrollbar-width:thin;scrollbar-color:#252535 #070710;border:1px solid var(--border);border-radius:10px;background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar{height:6px;}
 .lobby-piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -84,13 +81,16 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @keyframes popIn{from{transform:scale(.92);opacity:0}to{transform:scale(1);opacity:1}}
 .modal h3{font-family:'Space Mono',monospace;color:var(--accent);margin-bottom:18px;}
 .modal-btns{display:flex;gap:10px;margin-top:16px;}
-.sess-top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;}
+.sess-top{display:flex;align-items:center;justify-content:flex-end;padding:10px 20px;background:var(--surface);border-bottom:1px solid var(--border);gap:10px;flex-shrink:0;position:sticky;top:0;z-index:220;min-height:56px;}
+.sess-room-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;pointer-events:none;}
 .sess-room-name{font-family:'Space Mono',monospace;font-size:15px;color:var(--accent);font-weight:700;}
 .room-id-tag{display:none;font-family:'Space Mono',monospace;font-size:11px;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;color:#556;cursor:pointer;user-select:all;transition:border-color .2s;}
 .room-id-tag:hover{border-color:var(--accent);color:var(--accent);}
 .sess-controls{display:flex;align-items:center;gap:10px;}
 .vol-row{display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:10px;color:#556;}
 .vol-row input[type=range]{width:80px;accent-color:var(--accent);}
+.midi-route{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:10px;color:#6c789a;}
+.midi-route select{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:11px;padding:4px 8px;max-width:160px;}
 .players-bar{display:flex;gap:8px;padding:8px 20px;background:rgba(8,8,14,.6);border-bottom:1px solid var(--border);flex-wrap:wrap;align-items:center;justify-content:center;flex-shrink:0;}
 .player-chip{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;background:var(--surface2);border:1px solid var(--border);font-size:12px;transition:border-color .2s;}
 .player-chip.mine{cursor:pointer;border-style:dashed;}
@@ -149,16 +149,12 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v27</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v23</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
   </div>
 </header>
-<div class="midi-permission-banner" id="midiPermissionBanner">
-  <span id="midiPermissionText">MIDI 권한이 필요합니다. 주소창 권한에서 허용해 주세요.</span>
-  <button class="mini-btn" type="button" onclick="retryMidiPermission()">MIDI 허용 다시 요청</button>
-</div>
 
 <div class="screen active" id="lobby">
   <div class="hero">
@@ -201,14 +197,21 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 
 <div class="screen" id="session">
   <div class="sess-top">
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div class="sess-room-center">
       <div class="sess-room-name" id="sessRoomName">Room</div>
       <div class="room-id-tag" id="sessRoomId" onclick="copyRoomId()">------</div>
     </div>
     <div class="sess-controls">
       <div class="vol-row">🔊<input type="range" id="volSlider" min="0" max="1" step="0.05" value="0.2" oninput="setVolume(this.value)"></div>
-      <button class="btn btn-outline" id="pedalShareBtn" onclick="togglePedalShare()">페달 공유 OFF</button>
-      <button class="btn btn-outline" onclick="resetAllNotes()">reset</button>
+      <div class="midi-route">OUT
+        <select id="midiOutSel" onchange="applyMidiRoutingFromUi()">
+          <option value="">없음</option>
+        </select>
+      </div>
+      <div class="midi-route">CH
+        <select id="midiChSel" onchange="applyMidiRoutingFromUi()"></select>
+      </div>
+      <button class="btn btn-outline" onclick="panicAllNotes()">패닉</button>
       <button class="btn btn-red" onclick="leaveRoom()">방 나가기</button>
     </div>
   </div>
@@ -262,22 +265,17 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let midiOutputs=[];
 const recentOutboundMidi=new Map();
+let selectedMidiOutId='';
+let midiOutChannel=1;
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let roomListAutoTimer=null;
 let midiAutoAttempted=false;
-let midiPermissionBlocked=false;
-let sharePedalToRemote=false;
 let mouseDragActive=false,dragCurrentNote=null;
 let sustainPedalDown=false;
 let heldLocalNotes=new Set();
 let sustainedNotes=new Set();
-let sustainedSentNoteOff=new Set();
 let pendingNoteOns=new Map();
-let remotePedalDown=new Map();
-let remoteHeldNotes=new Map();
-let remoteSustainedNotes=new Map();
-let remoteDawChannel=new Map();
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -290,8 +288,7 @@ window.addEventListener('load',()=>{
   buildColorPickers();
   buildKeyboard88();
   buildLobbyKeyboard88();
-  refreshMidiPermissionBanner();
-  updatePedalShareBtn();
+  buildMidiRoutingUi();
   autoConnect();
   buildPopoverSwatches();
   autoEnableMidi();
@@ -333,27 +330,6 @@ function updateBanner(state,text){
   d.className='dot '+(state==='ok'?'ok':state==='err'?'err':'');
   t.textContent=text||(state==='connecting'?'서버 자동 연결 중...':'');
 }
-function refreshMidiPermissionBanner(message=''){
-  const box=document.getElementById('midiPermissionBanner');
-  const txt=document.getElementById('midiPermissionText');
-  if(!box||!txt) return;
-  if(midiConnected){
-    box.style.display='none';
-    return;
-  }
-  if(!('requestMIDIAccess' in navigator)){
-    txt.textContent='이 브라우저는 Web MIDI를 지원하지 않습니다. Chrome/Edge 권장.';
-    box.style.display='flex';
-    return;
-  }
-  if(midiPermissionBlocked){
-    txt.textContent=message||'MIDI 권한이 차단되어 있습니다. 주소창 권한에서 허용으로 바꿔 주세요.';
-    box.style.display='flex';
-    return;
-  }
-  txt.textContent=message||'MIDI 권한이 필요합니다. "MIDI 허용 다시 요청"을 눌러 주세요.';
-  box.style.display='flex';
-}
 
 function initAudio(){
   if(audioCtx) return;
@@ -376,29 +352,78 @@ function isRecentOutboundMidi(s,n,v){
   const key=(s&0xf0)+'_'+n+'_'+v;
   const t=recentOutboundMidi.get(key);
   if(!t) return false;
-  if(Date.now()-t>80){recentOutboundMidi.delete(key);return false;}
+  if(Date.now()-t>180){recentOutboundMidi.delete(key);return false;}
   return true;
+}
+function getTargetMidiOutputs(){
+  if(!midiOutputs.length) return [];
+  if(selectedMidiOutId){
+    const one=midiOutputs.find(o=>o.id===selectedMidiOutId);
+    return one?[one]:[];
+  }
+  return [];
+}
+function buildMidiRoutingUi(){
+  const chSel=document.getElementById('midiChSel');
+  if(chSel && chSel.options.length===0){
+    for(let ch=1;ch<=16;ch++){
+      const opt=document.createElement('option');
+      opt.value=String(ch);
+      opt.textContent=String(ch);
+      chSel.appendChild(opt);
+    }
+  }
+  if(chSel) chSel.value=String(midiOutChannel);
+}
+function applyMidiRoutingFromUi(){
+  const outSel=document.getElementById('midiOutSel');
+  const chSel=document.getElementById('midiChSel');
+  if(outSel) selectedMidiOutId=outSel.value||'';
+  if(chSel){
+    const v=parseInt(chSel.value,10);
+    midiOutChannel=(Number.isFinite(v)&&v>=1&&v<=16)?v:1;
+  }
 }
 function refreshMidiOutputs(){
   if(!midiAccess){midiOutputs=[];return;}
   midiOutputs=[...midiAccess.outputs.values()];
-}
-function sendMidiToDaw(status,data1,data2=0){
-  if(!midiOutputs.length) return;
-  const s=status&0xff,d1=data1&0x7f,d2=data2&0x7f;
-  markOutboundMidi(s,d1,d2);
+  const outSel=document.getElementById('midiOutSel');
+  if(!outSel) return;
+  outSel.innerHTML='';
+  const noneOpt=document.createElement('option');
+  noneOpt.value='';noneOpt.textContent='없음';
+  outSel.appendChild(noneOpt);
   for(const out of midiOutputs){
-    try{out.send([s,d1,d2]);}catch{}
+    const opt=document.createElement('option');
+    opt.value=out.id;
+    opt.textContent=out.name||('MIDI OUT '+out.id.slice(0,4));
+    outSel.appendChild(opt);
+  }
+  if(!selectedMidiOutId && midiOutputs.length) selectedMidiOutId=midiOutputs[0].id;
+  if(selectedMidiOutId && !midiOutputs.find(o=>o.id===selectedMidiOutId)) selectedMidiOutId='';
+  outSel.value=selectedMidiOutId;
+}
+function sendAllNotesOffToDaw(){
+  const targets=getTargetMidiOutputs();
+  if(!targets.length) return;
+  for(const out of targets){
+    try{
+      for(let ch=0;ch<16;ch++){
+        out.send([0xB0+ch,123,0]); // all notes off
+        out.send([0xB0+ch,120,0]); // all sound off
+      }
+    }catch{}
   }
 }
-function getRemoteDawChannel(sid){
-  // Hard-compat mode: always send remote MIDI on channel 1 so default DAW tracks receive immediately.
-  if(remoteDawChannel.has(sid)) return remoteDawChannel.get(sid);
-  remoteDawChannel.set(sid,1);
-  return 1;
-}
-function dawStatus(baseStatus,channel){
-  return (baseStatus&0xf0)|(channel&0x0f);
+function sendMidiToDaw(status,data1,data2=0){
+  const targets=getTargetMidiOutputs();
+  if(!targets.length) return;
+  const channel=((midiOutChannel-1)&0x0f);
+  const s=((status&0xf0)|channel)&0xff,d1=data1&0x7f,d2=data2&0x7f;
+  markOutboundMidi(s,d1,d2);
+  for(const out of targets){
+    try{out.send([s,d1,d2]);}catch{}
+  }
 }
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
@@ -461,20 +486,12 @@ function buildLobbyKeyboard88(){
   dst.innerHTML=src.innerHTML;
   dst.style.width=src.style.width;
   dst.style.height=src.style.height;
-  dst.style.transformOrigin='top center';
-  dst.style.margin='0 auto';
   dst.querySelectorAll('.wkey,.bkey').forEach(el=>{
     const note=parseInt(el.dataset.note,10);
     if(!Number.isNaN(note)) addKeyEvents(el,note);
   });
   const sc=document.getElementById('lobbyPianoScroll');
-  if(sc){
-    const fullW=parseInt(src.style.width,10)||1768;
-    const avail=Math.max(320,sc.clientWidth-24);
-    const scale=Math.min(1,avail/fullW);
-    dst.style.transform='scale('+scale+')';
-    sc.style.height=(Math.round(WKH*scale)+18)+'px';
-  }
+  if(sc) sc.scrollLeft=Math.max(0,parseInt(src.style.width,10)/2-sc.clientWidth/2);
 }
 function getKeyEl(n,rootId='keyboard'){
   const root=document.getElementById(rootId);
@@ -588,22 +605,10 @@ function localNoteOn(note,vel){
     return;
   }
   pendingNoteOns.delete(note);
-  if(pressedLocal.has(note)){
-    // While sustain is down, same-note retrigger should still light and sound again.
-    sustainedNotes.delete(note);
-    sustainedSentNoteOff.delete(note);
-    setKeyVisual(note,true,true,myColor);
-    killNote(note,activeOsc);
-    const retrigger=playNote(note,vel,false);
-    if(retrigger)activeOsc.set(note,retrigger);
-    updateActiveNotes();
-    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOn',note,velocity:vel}}));
-    return;
-  }
+  if(pressedLocal.has(note))return;
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
   const n=playNote(note,vel,false);if(n)activeOsc.set(note,n);
   sustainedNotes.delete(note);
-  sustainedSentNoteOff.delete(note);
   updateActiveNotes();
   if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOn',note,velocity:vel}}));
 }
@@ -612,11 +617,7 @@ function stopLocalNoteNow(note){
   pressedLocal.delete(note);setKeyVisual(note,false,true,null);
   killNote(note,activeOsc);updateActiveNotes();
   sustainedNotes.delete(note);
-  if(sustainedSentNoteOff.has(note)){
-    sustainedSentNoteOff.delete(note);
-  }else if(ws&&ws.readyState===1){
-    ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
-  }
+  if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
 }
 function localNoteOff(note,fromPhysical=true){
   if(fromPhysical) heldLocalNotes.delete(note);
@@ -624,10 +625,6 @@ function localNoteOff(note,fromPhysical=true){
   if(sustainPedalDown && fromPhysical){
     if(pressedLocal.has(note)) sustainedNotes.add(note);
     setKeyVisual(note,false,true,null);
-    if(ws&&ws.readyState===1){
-      ws.send(JSON.stringify({type:'midi',data:{type:'noteOff',note}}));
-      sustainedSentNoteOff.add(note);
-    }
     return;
   }
   stopLocalNoteNow(note);
@@ -639,68 +636,25 @@ function setSustainPedal(isDown){
     if(!heldLocalNotes.has(note)) stopLocalNoteNow(note);
   }
 }
-function getRemoteNoteSet(bucket,sid){
-  if(!bucket.has(sid)) bucket.set(sid,new Set());
-  return bucket.get(sid);
-}
-function remoteVisualRelease(note,sid){
-  if(!pressedRemote.has(note)) return;
-  const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
-  if(list.length===0){
-    pressedRemote.delete(note);
-    setKeyVisual(note,false,false,null);
-  }else{
-    pressedRemote.set(note,list);
-    setKeyVisual(note,true,false,list[list.length-1].color);
-  }
-}
-function setRemoteSustain(sid,isDown){
-  remotePedalDown.set(sid,!!isDown);
-  const ch=getRemoteDawChannel(sid);
-  sendMidiToDaw(dawStatus(0xB0,ch),64,isDown?127:0);
-  if(isDown) return;
-  const sustained=getRemoteNoteSet(remoteSustainedNotes,sid);
-  const held=getRemoteNoteSet(remoteHeldNotes,sid);
-  for(const note of Array.from(sustained)){
-    if(held.has(note)) continue;
-    sendMidiToDaw(dawStatus(0x80,ch),note,0);
-    killNote(sid+'_'+note,remoteOsc);
-    sustained.delete(note);
-  }
-}
 function remoteNoteOn(note,sid,sname,scolor,vel){
-  const ch=getRemoteDawChannel(sid);
-  getRemoteNoteSet(remoteHeldNotes,sid).add(note);
-  getRemoteNoteSet(remoteSustainedNotes,sid).delete(note);
   if(!pressedRemote.has(note))pressedRemote.set(note,[]);
   const list=pressedRemote.get(note);
   if(!list.find(x=>x.sid===sid))list.push({sid,color:scolor,name:sname});
   setKeyVisual(note,true,false,scolor);
-  sendMidiToDaw(dawStatus(0x90,ch),note,vel||100);
+  sendMidiToDaw(0x90,note,vel||100);
   const key=sid+'_'+note;
-  // Avoid doubled/phasey sound: when MIDI OUT exists, remote sound should come from DAW path only.
-  if(remoteOsc.has(key)) killNote(key,remoteOsc);
-  if(midiOutputs.length===0){
-    const n=playNote(note,vel,true);if(n)remoteOsc.set(key,n);
-  }
+  if(!remoteOsc.has(key)){const n=playNote(note,vel,true);if(n)remoteOsc.set(key,n);}
   updateActiveNotes();
 }
 function remoteNoteOff(note,sid){
-  const ch=getRemoteDawChannel(sid);
-  getRemoteNoteSet(remoteHeldNotes,sid).delete(note);
-  remoteVisualRelease(note,sid);
-  if(remotePedalDown.get(sid)){
-    getRemoteNoteSet(remoteSustainedNotes,sid).add(note);
-    updateActiveNotes();
-    return;
-  }
-  sendMidiToDaw(dawStatus(0x80,ch),note,0);
+  sendMidiToDaw(0x80,note,0);
   killNote(sid+'_'+note,remoteOsc);
-  getRemoteNoteSet(remoteSustainedNotes,sid).delete(note);
+  if(pressedRemote.has(note)){
+    const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
+    if(list.length===0){pressedRemote.delete(note);setKeyVisual(note,false,false,null);}
+    else{pressedRemote.set(note,list);setKeyVisual(note,true,false,list[list.length-1].color);}
+  }
   updateActiveNotes();
-}
-function remoteNoteVisualOff(note,sid){
-  remoteVisualRelease(note,sid);
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
@@ -724,12 +678,7 @@ function handleMsg(msg){
     case 'player_left':
       updatePlayers(msg.roomInfo.players);
       addChat(null,msg.playerName+'님이 퇴장했습니다','#556');
-      setRemoteSustain(msg.playerId,false);
       for(const[key]of remoteOsc){if(key.startsWith(msg.playerId+'_')){remoteNoteOff(parseInt(key.split('_')[1]),msg.playerId);}}
-      remotePedalDown.delete(msg.playerId);
-      remoteHeldNotes.delete(msg.playerId);
-      remoteSustainedNotes.delete(msg.playerId);
-      remoteDawChannel.delete(msg.playerId);
       break;
     case 'midi':
       if(msg.senderId===myId) break;
@@ -738,9 +687,8 @@ function handleMsg(msg){
         remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,c,msg.data.velocity);
       }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
-      else if(msg.data.type==='noteVisualOff')remoteNoteVisualOff(msg.data.note,msg.senderId);
       else if(msg.data.type==='controlChange' && msg.data.controller===64){
-        setRemoteSustain(msg.senderId,(msg.data.value||0)>=64);
+        sendMidiToDaw(0xB0,64,msg.data.value||0);
       }
       break;
     case 'color_changed':
@@ -793,9 +741,6 @@ function leaveRoom(){
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
-  sustainedSentNoteOff.clear();
-  remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
-  remoteDawChannel.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   document.getElementById('chatMsgs').innerHTML='';
@@ -803,7 +748,7 @@ function leaveRoom(){
   showScreen('lobby');
   refreshRooms();
 }
-function resetAllNotes(){
+function panicAllNotes(){
   for(const note of Array.from(pressedLocal)) localNoteOff(note,true);
   for(const [key] of Array.from(activeOsc)) killNote(key,activeOsc);
   for(const [key] of Array.from(remoteOsc)) killNote(key,remoteOsc);
@@ -811,17 +756,12 @@ function resetAllNotes(){
   pressedRemote.clear();
   heldLocalNotes.clear();
   sustainedNotes.clear();
-  sustainedSentNoteOff.clear();
-  remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
-  remoteDawChannel.clear();
   pendingNoteOns.clear();
   sustainPedalDown=false;
-  for(let n=MIDI_MIN;n<=MIDI_MAX;n++){
-    setKeyVisual(n,false,true,null);
-    setKeyVisual(n,false,false,null);
-  }
+  for(let n=MIDI_MIN;n<=MIDI_MAX;n++) setKeyVisual(n,false,true,null), setKeyVisual(n,false,false,null);
+  sendAllNotesOffToDaw();
   updateActiveNotes();
-  toast('reset: 모든 소리 정지');
+  toast('패닉: 모든 소리 정지');
 }
 
 function forceDisconnectToLobby(){
@@ -829,9 +769,6 @@ function forceDisconnectToLobby(){
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
-  sustainedSentNoteOff.clear();
-  remotePedalDown.clear();remoteHeldNotes.clear();remoteSustainedNotes.clear();
-  remoteDawChannel.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
   showScreen('lobby');
@@ -918,26 +855,14 @@ async function toggleMidiInput(){
   try{midiAccess=await navigator.requestMIDIAccess();connectMidi();}catch{toast('MIDI 권한 필요',true);}
 }
 async function autoEnableMidi(){
-  if(!('requestMIDIAccess' in navigator)){
-    refreshMidiPermissionBanner();
-    return;
-  }
-  if(midiConnected || midiAutoAttempted) return;
+  if(midiConnected || midiAutoAttempted || !('requestMIDIAccess' in navigator)) return;
   midiAutoAttempted=true;
   try{
     midiAccess=await navigator.requestMIDIAccess();
-    midiPermissionBlocked=false;
     connectMidi();
   }catch{
-    midiPermissionBlocked=true;
-    refreshMidiPermissionBanner();
+    midiAutoAttempted=false;
   }
-}
-async function retryMidiPermission(){
-  midiAutoAttempted=false;
-  midiPermissionBlocked=false;
-  refreshMidiPermissionBanner('MIDI 권한 요청 중...');
-  await autoEnableMidi();
 }
 function connectMidi(){
   if(!midiAccess) return;
@@ -949,14 +874,12 @@ function connectMidi(){
   };
   midiConnected=true;
   document.getElementById('midiBadge').classList.add('active');toast('MIDI 연결됨');
-  refreshMidiPermissionBanner();
 }
 function disconnectMidi(){
   if(midiAccess)for(const i of midiAccess.inputs.values())i.onmidimessage=null;
   midiOutputs=[];
   midiConnected=false;
   document.getElementById('midiBadge').classList.remove('active');
-  refreshMidiPermissionBanner();
 }
 function onMidiMessage(e){
   const[s,n,v]=e.data,cmd=s&0xf0;
@@ -965,9 +888,7 @@ function onMidiMessage(e){
   else if(cmd===0x80||(cmd===0x90&&v===0))localNoteOff(n,true);
   else if(cmd===0xB0&&n===64){
     setSustainPedal(v>=64);
-    if(sharePedalToRemote && ws&&ws.readyState===1){
-      ws.send(JSON.stringify({type:'midi',data:{type:'controlChange',controller:64,value:v}}));
-    }
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'controlChange',controller:64,value:v}}));
   }
 }
 
@@ -1015,18 +936,6 @@ function showScreen(n){
 function setConnStatus(s){
   document.getElementById('connDot').className='dot '+(s==='ok'?'ok':s==='err'?'err':'');
   document.getElementById('connLabel').textContent=s==='ok'?'연결됨':s==='err'?'연결 끊김':'연결 중...';
-}
-function updatePedalShareBtn(){
-  const btn=document.getElementById('pedalShareBtn');
-  if(!btn) return;
-  btn.textContent='페달 공유 '+(sharePedalToRemote?'ON':'OFF');
-  btn.style.borderColor=sharePedalToRemote?'#ff6b35':'var(--accent)';
-  btn.style.color=sharePedalToRemote?'#ff6b35':'var(--accent)';
-}
-function togglePedalShare(){
-  sharePedalToRemote=!sharePedalToRemote;
-  updatePedalShareBtn();
-  toast('페달 공유 '+(sharePedalToRemote?'ON':'OFF'));
 }
 function toast(m,e=false){
   const t=document.getElementById('toast');t.textContent=m;t.className='toast show'+(e?' error':'');
