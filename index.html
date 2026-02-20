@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v17</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v18</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -330,23 +330,31 @@ function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
   if(audioCtx.state==='suspended') return null;
+  const now=audioCtx.currentTime;
   const f=midiToFreq(note);
   const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();
-  const g1=audioCtx.createGain(),g2=audioCtx.createGain();
+  const g1=audioCtx.createGain(),g2=audioCtx.createGain(),tone=audioCtx.createBiquadFilter();
   o1.type='triangle';o1.frequency.value=f;
-  o2.type='sine';o2.frequency.value=f*2;g2.gain.value=0.12;
-  const v2=(vel/127)*(remote?.38:.5);
-  g1.gain.setValueAtTime(v2,audioCtx.currentTime);
-  g1.gain.setTargetAtTime(v2*.82,audioCtx.currentTime+.02,.12);
-  o1.connect(g1);o2.connect(g2);g1.connect(masterGain);g2.connect(masterGain);
+  o2.type='sine';o2.frequency.value=f*2.01;
+  tone.type='lowpass';tone.frequency.setValueAtTime(remote?3800:4600,now);tone.Q.value=0.9;
+  const peak=(vel/127)*(remote?0.24:0.32);
+  g1.gain.setValueAtTime(0,now);
+  g2.gain.setValueAtTime(0,now);
+  g1.gain.linearRampToValueAtTime(peak,now+0.003);
+  g2.gain.linearRampToValueAtTime(peak*0.22,now+0.004);
+  g1.gain.exponentialRampToValueAtTime(Math.max(0.0008,peak*0.2),now+0.2);
+  g2.gain.exponentialRampToValueAtTime(Math.max(0.0006,peak*0.06),now+0.18);
+  g1.gain.exponentialRampToValueAtTime(0.0001,now+(remote?1.4:1.9));
+  g2.gain.exponentialRampToValueAtTime(0.0001,now+(remote?1.2:1.6));
+  o1.connect(g1);o2.connect(g2);g1.connect(tone);g2.connect(tone);tone.connect(masterGain);
   o1.start();o2.start();
-  return{o1,o2,g1,g2};
+  return{o1,o2,g1,g2,tone};
 }
 function killNote(key,map){
   const n=map.get(key);if(!n)return;
-  n.g1.gain.setTargetAtTime(0,audioCtx.currentTime,.07);
-  n.g2.gain.setTargetAtTime(0,audioCtx.currentTime,.07);
-  setTimeout(()=>{try{n.o1.stop();n.o2.stop();}catch{}},350);
+  n.g1.gain.setTargetAtTime(0,audioCtx.currentTime,.04);
+  n.g2.gain.setTargetAtTime(0,audioCtx.currentTime,.04);
+  setTimeout(()=>{try{n.o1.stop();n.o2.stop();}catch{}},220);
   map.delete(key);
 }
 function flushPendingNoteOns(){
