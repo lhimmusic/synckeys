@@ -17,8 +17,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .logo{font-family:'Space Mono',monospace;font-size:18px;font-weight:700;letter-spacing:3px;}
 .logo .k{color:var(--accent);}.logo .s{color:var(--accent2);}
 .app-ver{margin-left:10px;font-size:11px;color:#6b7396;letter-spacing:1px;}
-.insta-badge{margin-left:10px;padding:3px 8px;border-radius:999px;border:1px solid #ff6b35;color:#111;text-decoration:none;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:1px;background:#ff6b35;}
-.insta-badge:hover{background:#ff814f;color:#111;}
 .header-right{display:flex;gap:12px;align-items:center;}
 .conn-status{display:flex;align-items:center;gap:8px;font-family:'Space Mono',monospace;font-size:11px;color:#556;}
 .dot{width:8px;height:8px;border-radius:50%;background:#333;transition:all .4s;}
@@ -36,8 +34,6 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 .hero h1 .k{color:var(--accent);text-shadow:0 0 60px rgba(0,229,255,.35);}
 .hero h1 .s{color:var(--accent2);text-shadow:0 0 60px rgba(255,107,53,.28);}
 .hero p{color:#556088;font-size:14px;font-weight:300;}
-.audio-greeting{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border:1px solid var(--accent);border-radius:999px;background:rgba(0,229,255,.08);color:var(--accent);font-family:'Space Mono',monospace;font-size:12px;cursor:pointer;transition:all .2s;position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;}
-.audio-greeting:hover{background:rgba(0,229,255,.14);box-shadow:0 0 18px rgba(0,229,255,.22);}
 .server-banner{display:flex;align-items:center;justify-content:center;gap:10px;padding:10px 20px;margin-bottom:28px;background:var(--surface);border:1px solid var(--border);border-radius:10px;font-family:'Space Mono',monospace;font-size:12px;color:#556;transition:all .3s;}
 .server-banner.ok{border-color:var(--green);color:var(--green);}
 .server-banner.err{border-color:var(--danger);color:var(--danger);}
@@ -45,7 +41,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 @media(max-width:600px){.grid2{grid-template-columns:1fr;}}
 .lobby-piano-card{margin-bottom:20px;padding:14px 12px;}
 .lobby-piano-title{font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin:2px 8px 10px;}
-.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;position:relative;}
+.lobby-piano-scroll{height:220px;padding:10px 12px 0;overflow:hidden;display:flex;align-items:flex-start;justify-content:center;scrollbar-width:none;border:1px solid var(--border);border-radius:10px;background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar{height:6px;}
 .lobby-piano-scroll::-webkit-scrollbar-track{background:#070710;}
 .lobby-piano-scroll::-webkit-scrollbar-thumb{background:#252535;border-radius:3px;}
@@ -150,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v26</span><a class="insta-badge" href="https://www.instagram.com/lhimmusic" target="_blank" rel="noopener noreferrer">INSTAGRAM</a></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v22</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -166,8 +162,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
     <div class="dot" id="bannerDot"></div><span id="bannerText">서버에 자동 연결 중...</span>
   </div>
   <div class="card lobby-piano-card">
+    <div class="lobby-piano-title">LOBBY KEYBOARD</div>
     <div class="lobby-piano-scroll" id="lobbyPianoScroll">
-      <button class="audio-greeting" id="audioGreeting" onclick="unlockAudioFromGreeting()">건반을 사용하려면 클릭</button>
       <div class="keyboard" id="lobbyKeyboard"></div>
     </div>
   </div>
@@ -258,7 +254,7 @@ let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
 let midiOutputs=[];
 const recentOutboundMidi=new Map();
-let pressedLocal=new Set(),pressedRemote=new Map(),pressedRemoteVisual=new Map();
+let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let roomListAutoTimer=null;
 let midiAutoAttempted=false;
@@ -267,7 +263,6 @@ let sustainPedalDown=false;
 let heldLocalNotes=new Set();
 let sustainedNotes=new Set();
 let pendingNoteOns=new Map();
-let audioGreetingDismissed=false;
 
 const MIDI_MIN=21,MIDI_MAX=108;
 const NOTE_NAMES=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
@@ -283,7 +278,6 @@ window.addEventListener('load',()=>{
   autoConnect();
   buildPopoverSwatches();
   autoEnableMidi();
-  updateAudioGreeting();
 });
 
 // 사용자가 화면을 클릭할 때마다 오디오 엔진 활성화 시도 (브라우저 정책 해결)
@@ -333,20 +327,7 @@ async function ensureAudioReady(){
   if(audioCtx && audioCtx.state==='suspended'){
     try{await audioCtx.resume();}catch{}
   }
-  updateAudioGreeting();
   flushPendingNoteOns();
-}
-function updateAudioGreeting(){
-  const el=document.getElementById('audioGreeting');
-  if(!el) return;
-  const unlocked=!!(audioCtx && audioCtx.state==='running');
-  el.style.display=(audioGreetingDismissed||unlocked)?'none':'inline-flex';
-}
-async function unlockAudioFromGreeting(){
-  audioGreetingDismissed=true;
-  await ensureAudioReady();
-  autoEnableMidi();
-  updateAudioGreeting();
 }
 function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=volume;}
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
@@ -375,29 +356,23 @@ function sendMidiToDaw(status,data1,data2=0){
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
   if(audioCtx.state==='suspended') return null;
-  const now=audioCtx.currentTime;
   const f=midiToFreq(note);
   const o1=audioCtx.createOscillator(),o2=audioCtx.createOscillator();
   const g1=audioCtx.createGain(),g2=audioCtx.createGain();
-  // Short pluck envelope: quick attack + fast decay (pedal-independent feel)
-  o1.type='sawtooth';o1.frequency.value=f;
-  o2.type='triangle';o2.frequency.value=f*2.01;
-  const peak=(vel/127)*(remote?.22:.32);
-  g1.gain.setValueAtTime(0.0001,now);
-  g2.gain.setValueAtTime(0.0001,now);
-  g1.gain.exponentialRampToValueAtTime(Math.max(0.001,peak),now+0.004);
-  g2.gain.exponentialRampToValueAtTime(Math.max(0.0006,peak*0.18),now+0.006);
-  g1.gain.exponentialRampToValueAtTime(0.0001,now+(remote?0.26:0.34));
-  g2.gain.exponentialRampToValueAtTime(0.0001,now+(remote?0.2:0.28));
+  o1.type='triangle';o1.frequency.value=f;
+  o2.type='sine';o2.frequency.value=f*2;g2.gain.value=0.12;
+  const v2=(vel/127)*(remote?.38:.5);
+  g1.gain.setValueAtTime(v2,audioCtx.currentTime);
+  g1.gain.setTargetAtTime(v2*.82,audioCtx.currentTime+.02,.12);
   o1.connect(g1);o2.connect(g2);g1.connect(masterGain);g2.connect(masterGain);
   o1.start();o2.start();
   return{o1,o2,g1,g2};
 }
 function killNote(key,map){
   const n=map.get(key);if(!n)return;
-  n.g1.gain.setTargetAtTime(0,audioCtx.currentTime,.03);
-  n.g2.gain.setTargetAtTime(0,audioCtx.currentTime,.03);
-  setTimeout(()=>{try{n.o1.stop();n.o2.stop();}catch{}},120);
+  n.g1.gain.setTargetAtTime(0,audioCtx.currentTime,.07);
+  n.g2.gain.setTargetAtTime(0,audioCtx.currentTime,.07);
+  setTimeout(()=>{try{n.o1.stop();n.o2.stop();}catch{}},350);
   map.delete(key);
 }
 function flushPendingNoteOns(){
@@ -469,7 +444,7 @@ function setKeyVisual(note,on,isLocal,color){
         el.style.setProperty('box-shadow','inset 0 3px 10px rgba(0,0,0,.35),0 0 20px '+myColor+'99','important');
       }else{
         el.classList.remove('pressed-local');
-        const r=pressedRemoteVisual.get(note);
+        const r=pressedRemote.get(note);
         if(r&&r.length){
           const rc=r[r.length-1].color;
           el.classList.add('pressed-remote');
@@ -566,11 +541,7 @@ function localNoteOn(note,vel){
     return;
   }
   pendingNoteOns.delete(note);
-  if(pressedLocal.has(note)){
-    // Allow re-trigger even while pedal is down.
-    killNote(note,activeOsc);
-    pressedLocal.delete(note);
-  }
+  if(pressedLocal.has(note))return;
   pressedLocal.add(note);setKeyVisual(note,true,true,myColor);
   const n=playNote(note,vel,false);if(n)activeOsc.set(note,n);
   sustainedNotes.delete(note);
@@ -604,12 +575,9 @@ function setSustainPedal(isDown){
 }
 function remoteNoteOn(note,sid,sname,scolor,vel){
   if(!pressedRemote.has(note))pressedRemote.set(note,[]);
-  if(!pressedRemoteVisual.has(note))pressedRemoteVisual.set(note,[]);
   const list=pressedRemote.get(note);
-  const vlist=pressedRemoteVisual.get(note);
   if(!list.find(x=>x.sid===sid))list.push({sid,color:scolor,name:sname});
-  if(!vlist.find(x=>x.sid===sid))vlist.push({sid,color:scolor,name:sname});
-  setKeyVisual(note,true,false,vlist[vlist.length-1].color);
+  setKeyVisual(note,true,false,scolor);
   sendMidiToDaw(0x90,note,vel||100);
   const key=sid+'_'+note;
   if(!remoteOsc.has(key)){const n=playNote(note,vel,true);if(n)remoteOsc.set(key,n);}
@@ -620,26 +588,16 @@ function remoteNoteOff(note,sid){
   killNote(sid+'_'+note,remoteOsc);
   if(pressedRemote.has(note)){
     const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
-    if(list.length===0) pressedRemote.delete(note);
-    else pressedRemote.set(note,list);
-  }
-  if(pressedRemoteVisual.has(note)){
-    const vlist=pressedRemoteVisual.get(note).filter(x=>x.sid!==sid);
-    if(vlist.length===0){pressedRemoteVisual.delete(note);setKeyVisual(note,false,false,null);}
-    else{pressedRemoteVisual.set(note,vlist);setKeyVisual(note,true,false,vlist[vlist.length-1].color);}
+    if(list.length===0){pressedRemote.delete(note);setKeyVisual(note,false,false,null);}
+    else{pressedRemote.set(note,list);setKeyVisual(note,true,false,list[list.length-1].color);}
   }
   updateActiveNotes();
 }
 function remoteNoteVisualOff(note,sid){
-  if(!pressedRemoteVisual.has(note)) return;
-  const vlist=pressedRemoteVisual.get(note).filter(x=>x.sid!==sid);
-  if(vlist.length===0){
-    pressedRemoteVisual.delete(note);
-    if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
-  }else{
-    pressedRemoteVisual.set(note,vlist);
-    setKeyVisual(note,true,false,vlist[vlist.length-1].color);
-  }
+  if(!pressedRemote.has(note)) return;
+  // Visual-only off while sustain is held. Keep remote pressed state
+  // so subsequent noteOff handling and voice cleanup stay consistent.
+  if(!pressedLocal.has(note)) setKeyVisual(note,false,false,null);
 }
 function updateActiveNotes(){
   const el=document.getElementById('activeNotes');
@@ -726,7 +684,6 @@ function leaveRoom(){
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
-  pressedRemote.clear();pressedRemoteVisual.clear();
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
@@ -741,7 +698,6 @@ function resetAllNotes(){
   for(const [key] of Array.from(remoteOsc)) killNote(key,remoteOsc);
   pressedLocal.clear();
   pressedRemote.clear();
-  pressedRemoteVisual.clear();
   heldLocalNotes.clear();
   sustainedNotes.clear();
   pendingNoteOns.clear();
@@ -758,7 +714,6 @@ function forceDisconnectToLobby(){
   pressedLocal.forEach(n=>localNoteOff(n));
   activeOsc.forEach((val, key) => killNote(key, activeOsc));
   remoteOsc.forEach((val, key) => killNote(key, remoteOsc));
-  pressedRemote.clear();pressedRemoteVisual.clear();
   sustainPedalDown=false;heldLocalNotes.clear();sustainedNotes.clear();
   pendingNoteOns.clear();
   currentRoomId=null;myId=null;latencyMap.clear();playerMap.clear();
