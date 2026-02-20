@@ -96,6 +96,15 @@ wss.on('connection', (ws) => {
         }
         break;
       }
+      case 'color_change': {
+        if (!currentRoom) return;
+        const room = rooms.get(currentRoom);
+        if (!room || !room.clients.has(ws)) return;
+        clientInfo.color = msg.color;
+        room.clients.set(ws, clientInfo);
+        broadcast(room, { type: 'color_changed', playerId: clientId, color: msg.color }, null);
+        break;
+      }
       case 'get_rooms': {
         const list = [];
         for (const [id, room] of rooms) list.push({ id, name: room.name, players: room.clients.size, maxPlayers: room.maxPlayers, hasPassword: !!room.password });
