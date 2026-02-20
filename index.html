@@ -146,7 +146,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <body>
 <div class="wrap">
 <header>
-  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v17</span></div>
+  <div class="logo"><span class="k">SYNC</span><span class="s">KEYS</span><span class="app-ver">v19</span></div>
   <div class="header-right">
     <div class="midi-badge" id="midiBadge">NO MIDI</div>
     <div class="conn-status"><div class="dot" id="connDot"></div><span id="connLabel">연결 중...</span></div>
@@ -226,7 +226,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:14p
 <div class="modal-bg" id="pwModal">
   <div class="modal">
     <h3>🔒 비밀번호 입력</h3>
-    <div class="field"><label>방 비밀번호 (숫자 4자리)</label><input type="password" id="modalPw" placeholder="1234" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" oninput="this.value=this.value.replace(/\\D/g,'').slice(0,4)" onkeydown="if(event.key==='Enter')confirmPw()"></div>
+    <div class="field"><label>방 비밀번호 (숫자 4자리)</label><input type="password" id="modalPw" inputmode="numeric" maxlength="4" pattern="[0-9]{4}" oninput="this.value=this.value.replace(/\\D/g,'').slice(0,4)" onkeydown="if(event.key==='Enter')confirmPw()"></div>
     <div class="modal-btns">
       <button class="btn btn-primary" style="flex:1" onclick="confirmPw()">참가</button>
       <button class="btn btn-red" onclick="closePwModal()">취소</button>
@@ -251,6 +251,8 @@ let ws=null,myId=null,myColor='#00e5ff',myName='',currentRoomId=null,pendingJoin
 let audioCtx=null,masterGain=null,volume=0.2;
 let activeOsc=new Map(),remoteOsc=new Map();
 let midiAccess=null,midiConnected=false;
+let midiOutputs=[];
+const recentOutboundMidi=new Map();
 let pressedLocal=new Set(),pressedRemote=new Map();
 let latencyMap=new Map(),playerMap=new Map(),pingInterval=null;
 let midiAutoAttempted=false;
@@ -327,6 +329,28 @@ async function ensureAudioReady(){
 }
 function setVolume(v){volume=parseFloat(v);if(masterGain)masterGain.gain.value=volume;}
 function midiToFreq(n){return 440*Math.pow(2,(n-69)/12);}
+function markOutboundMidi(s,n,v){
+  recentOutboundMidi.set((s&0xf0)+'_'+n+'_'+v,Date.now());
+}
+function isRecentOutboundMidi(s,n,v){
+  const key=(s&0xf0)+'_'+n+'_'+v;
+  const t=recentOutboundMidi.get(key);
+  if(!t) return false;
+  if(Date.now()-t>80){recentOutboundMidi.delete(key);return false;}
+  return true;
+}
+function refreshMidiOutputs(){
+  if(!midiAccess){midiOutputs=[];return;}
+  midiOutputs=[...midiAccess.outputs.values()];
+}
+function sendMidiToDaw(status,data1,data2=0){
+  if(!midiOutputs.length) return;
+  const s=status&0xff,d1=data1&0x7f,d2=data2&0x7f;
+  markOutboundMidi(s,d1,d2);
+  for(const out of midiOutputs){
+    try{out.send([s,d1,d2]);}catch{}
+  }
+}
 function playNote(note,vel=100,remote=false){
   if(!audioCtx) initAudio();
   if(audioCtx.state==='suspended') return null;
@@ -543,11 +567,13 @@ function remoteNoteOn(note,sid,sname,scolor,vel){
   const list=pressedRemote.get(note);
   if(!list.find(x=>x.sid===sid))list.push({sid,color:scolor,name:sname});
   setKeyVisual(note,true,false,scolor);
+  sendMidiToDaw(0x90,note,vel||100);
   const key=sid+'_'+note;
   if(!remoteOsc.has(key)){const n=playNote(note,vel,true);if(n)remoteOsc.set(key,n);}
   updateActiveNotes();
 }
 function remoteNoteOff(note,sid){
+  sendMidiToDaw(0x80,note,0);
   killNote(sid+'_'+note,remoteOsc);
   if(pressedRemote.has(note)){
     const list=pressedRemote.get(note).filter(x=>x.sid!==sid);
@@ -587,6 +613,9 @@ function handleMsg(msg){
         remoteNoteOn(msg.data.note,msg.senderId,msg.senderName,c,msg.data.velocity);
       }
       else if(msg.data.type==='noteOff')remoteNoteOff(msg.data.note,msg.senderId);
+      else if(msg.data.type==='controlChange' && msg.data.controller===64){
+        sendMidiToDaw(0xB0,64,msg.data.value||0);
+      }
       break;
     case 'color_changed':
       if(playerMap.has(msg.playerId)){playerMap.get(msg.playerId).color=msg.color;renderPlayers();renderLatency();}
@@ -739,20 +768,29 @@ async function autoEnableMidi(){
 function connectMidi(){
   if(!midiAccess) return;
   for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;
-  midiAccess.onstatechange=()=>{for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;};
+  refreshMidiOutputs();
+  midiAccess.onstatechange=()=>{
+    for(const i of midiAccess.inputs.values())i.onmidimessage=onMidiMessage;
+    refreshMidiOutputs();
+  };
   midiConnected=true;
   document.getElementById('midiBadge').classList.add('active');toast('MIDI 연결됨');
 }
 function disconnectMidi(){
   if(midiAccess)for(const i of midiAccess.inputs.values())i.onmidimessage=null;
+  midiOutputs=[];
   midiConnected=false;
   document.getElementById('midiBadge').classList.remove('active');
 }
 function onMidiMessage(e){
   const[s,n,v]=e.data,cmd=s&0xf0;
+  if(isRecentOutboundMidi(s,n,v)) return;
   if(cmd===0x90&&v>0)localNoteOn(n,v);
   else if(cmd===0x80||(cmd===0x90&&v===0))localNoteOff(n,true);
-  else if(cmd===0xB0&&n===64)setSustainPedal(v>=64);
+  else if(cmd===0xB0&&n===64){
+    setSustainPedal(v>=64);
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'midi',data:{type:'controlChange',controller:64,value:v}}));
+  }
 }
 
 function buildColorPickers(){
